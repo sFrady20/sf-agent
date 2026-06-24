@@ -14,6 +14,8 @@ The core pain: planning appointments, recurring chores, and remembering things.
 
 - ✅ Quick-capture inbox (`capture`) — text it a thought, it files it.
 - ✅ Recurring chores + tasks (`add_task` / `list_tasks`) with cadence + due dates.
+- ✅ Google Calendar read/write (`list_calendar_events` / `create_calendar_event`)
+  via a service account (writes are approval-gated).
 - 🔜 Recurring-chore engine: turn `recur` into real reminders (trash day, HVAC
   filter, car maintenance, water filters, plants) via schedules.
 - 🔜 Appointment tracking + reminders: pediatrician, dentist, and OB/prenatal
@@ -60,7 +62,8 @@ The "remembering things throughout the day" problem.
 
 ## 🔔 Proactive layer
 
-- ✅ Morning brief schedule (`morning_brief`) — delivers to Discord.
+- ✅ Morning brief schedule (`morning_brief`) — delivers to Telegram; folds in
+  calendar + tasks + inbox.
 - 🔜 Evening review (what got done, tomorrow's prep).
 - 💡 Weekly planning sweep.
 
@@ -69,14 +72,16 @@ The "remembering things throughout the day" problem.
 ## Build phases
 
 - **Phase 0 — Foundation** ✅ *(this scaffold)*
-  Discord channel, swappable storage layer + memory tools, instructions, model
-  bump, locked-down HTTP route, evals harness, docs.
+  Telegram (chat) + Discord (slash) channels, swappable storage layer + memory
+  tools, service-account Calendar tools, instructions, model bump, locked-down
+  HTTP route, evals harness, docs.
 - **Phase 1 — Capture & recall** 🔜
   Harden the inbox/facts/tasks flow; wire the durable KV; ship the daily brief
   and evening review.
-- **Phase 2 — Calendar & tasks**
-  Activate the Google Calendar/Tasks connection; recurring-chore engine;
-  appointment reminders with human-in-the-loop approval.
+- **Phase 2 — Calendar & chores**
+  Calendar read/write is in (service account). Next: a recurring-chore engine
+  that turns `recur` into reminders, and appointment reminders. Google Tasks
+  would need the OAuth refresh-token route.
 - **Phase 3 — Domain packs**
   Extend travel; add DJ / dev / freelance / gamedev as skills + subagents.
 - **Phase 4 — Showcase polish**

@@ -2,8 +2,7 @@
 
 sf-agent is built on [eve](https://beta.eve.dev), a filesystem-first agent
 framework: capability comes from which folder a file lands in. This doc is the
-map. For the framework's own guides, read `node_modules/eve/dist/docs/public/`
-(also mirrored at `node_modules/eve/docs/`).
+map. For the framework's own guides, read `node_modules/eve/docs/`.
 
 ## The shape
 
@@ -14,8 +13,10 @@ agent/
     00-identity.md        Who the agent is, who Steven is.
     10-behavior.md        Operating rules (proactive capture, confirm side effects).
     20-memory.md          How to use the memory tools.
+    30-calendar.md        How to use the calendar tools.
   channels/             How you reach the agent.
-    discord.ts            Primary. Owner-gated slash commands, buttons, modals.
+    telegram.ts           Conversational chat (continuous, free-text).
+    discord.ts            Slash commands + the bot's presence (owner-gated).
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
@@ -23,15 +24,18 @@ agent/
     remember_fact.ts      Save/update durable profile facts.
     add_task.ts           Add a task or recurring chore.
     list_tasks.ts         List open/all tasks.
+    list_calendar_events.ts    Read Google Calendar.
+    create_calendar_event.ts   Write to Google Calendar (approval-gated).
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md
   schedules/            Proactive cron jobs.
-    morning_brief.ts      Daily brief delivered to Discord.
+    morning_brief.ts      Daily brief delivered to Telegram.
   subagents/            Specialist child agents.
     planner/              Example: decompose a fuzzy goal into a plan.
   lib/                  Shared, import-only code (never enters the sandbox).
     store/                The durable-memory backbone (see below).
+    google.ts             Service-account Calendar access (JWT, zero-dep).
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
 ```
@@ -59,16 +63,18 @@ and tools don't move.
 
 ## Security posture
 
+- **Telegram** verifies the `X-Telegram-Bot-Api-Secret-Token` header, and
+  `onMessage` drops anything not from `OWNER_TELEGRAM_USER_ID`.
 - **Discord** verifies Ed25519 signatures on every interaction, and
   `onCommand` drops anything not from `OWNER_DISCORD_USER_ID`.
 - **eve HTTP channel** is restricted to `localDev()` + `vercelOidc()` — reachable
   from your own CLI and trusted Vercel deployments, not the public web. Add real
   auth before exposing a browser UI.
-- **Side-effecting actions** (sending, booking, buying) should be gated with
-  human-in-the-loop approval — `needsApproval` from `eve/tools/approval` on a
-  tool, or `approval` on a connection. The instructions also tell the model to
-  confirm first.
-- Connection credentials never reach the model; eve brokers them per step.
+- **Side-effecting actions** (sending, booking, buying) are gated with
+  human-in-the-loop approval — `needsApproval` from `eve/tools/approval`, as on
+  `create_calendar_event`. The instructions also tell the model to confirm first.
+- Secrets stay server-side: the Google service-account key and any connection
+  credentials live in tools/env and never reach the model.
 
 ## Environment
 
@@ -76,11 +82,13 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 
 | Var | Purpose |
 | --- | --- |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram channel |
+| `OWNER_TELEGRAM_USER_ID` | Restrict the agent to you; also the brief's target |
 | `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` / `DISCORD_BOT_TOKEN` | Discord channel |
-| `OWNER_DISCORD_USER_ID` | Restrict the agent to you |
-| `OWNER_DISCORD_CHANNEL_ID` | Where the morning brief posts |
+| `OWNER_DISCORD_USER_ID` | Restrict Discord commands to you |
 | `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Durable store (optional) |
-| `GOOGLE_MCP_URL` / `GOOGLE_MCP_TOKEN` | Google Calendar/Tasks MCP (optional) |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google service account |
+| `GOOGLE_CALENDAR_ID` | Calendar to read/write (your email address) |
 
 ## Extending
 
@@ -100,25 +108,23 @@ export default defineTool({
 });
 ```
 
-**Activate Google Calendar / Tasks** — create `agent/connections/google.ts`. The
-connection is documented but intentionally not committed yet, so an unconfigured
-MCP server can't fail at boot. Drop this in once you have an MCP endpoint:
+**Google Calendar (service account)** — wired via `lib/google.ts` and the
+`list_calendar_events` / `create_calendar_event` tools. No per-user OAuth: a
+service account signs a JWT locally (zero-dep, Node crypto) and exchanges it for
+an access token. To set it up:
 
-```ts title="agent/connections/google.ts"
-import { defineMcpClientConnection } from "eve/connections";
-import { once } from "eve/tools/approval";
+1. In Google Cloud (project with the Calendar API enabled), create a **service
+   account** and download a JSON key.
+2. In Google Calendar → your calendar's *Settings and sharing* → **Share with
+   specific people** → add the service account's email with "Make changes to
+   events".
+3. Set `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (the
+   PEM, newlines escaped as `\n`), and `GOOGLE_CALENDAR_ID` (your email address —
+   not `primary`, which is the service account's own empty calendar).
 
-export default defineMcpClientConnection({
-  url: process.env.GOOGLE_MCP_URL!,
-  description: "Google Calendar and Tasks: events, reminders, to-dos.",
-  auth: { getToken: async () => ({ token: process.env.GOOGLE_MCP_TOKEN! }) },
-  approval: once(), // ask before the first write each session
-});
-```
-
-Prefer per-user OAuth? Swap `auth` for `connect("google/sf-agent")` from
-`@vercel/connect/eve` (already a dependency). The model never sees the token; it
-discovers tools via `connection_search` and calls `google__<tool>`.
+A service account can't reach Google **Tasks** on a personal Gmail (no sharing,
+no domain-wide delegation), so Tasks would need the OAuth refresh-token route.
+The agent's own `add_task` / `list_tasks` cover to-dos in the meantime.
 
 **Add a proactive job** — a file in `agent/schedules/`. Cron is UTC on Vercel;
 `eve dev` never fires schedules (use the dispatch route in the schedule's
