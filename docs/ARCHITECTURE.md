@@ -32,12 +32,16 @@ agent/
     list_calendar_events.ts    Read Google Calendar.
     create_calendar_event.ts   Write to Google Calendar (approval-gated).
     harmonic_matches.ts   Camelot-wheel compatible keys (DJ).
+    list_work.ts          List work from the GitHub board.
+    add_work_item.ts      Add a card to the GitHub board.
+    set_work_status.ts    Move a card on the GitHub board.
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
     dj_set.md             DJ sets, harmonic mixing, crate.
     freelance.md          Client/project ops.
     gamedev.md            Devlog, backlog, playtests.
+    work.md               GitHub board: status + tracking.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
@@ -49,6 +53,7 @@ agent/
     time.ts               Time-zone helpers (local "today", quiet hours).
     reminders.ts          Reminder selection + dedup (used by the cron channel).
     google.ts             Service-account Calendar access (JWT, zero-dep).
+    github.ts             Projects v2 GraphQL (one board, zero-dep).
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
 ```
@@ -106,6 +111,8 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `OWNER_TIMEZONE` | Local tz for reminder "today" + quiet hours |
 | `APPOINTMENT_LEAD_MIN` | Minutes before an event to nudge (default 60) |
 | `CRON_SECRET` | Bearer secret for `POST /eve/v1/cron/reminders` |
+| `GITHUB_TOKEN` | PAT with Projects read/write |
+| `GITHUB_PROJECT_ID` | The agent's board (a copy of your real board) — node id |
 
 ## Extending
 
@@ -207,6 +214,20 @@ content `includes`) plus one LLM-as-judge (`closedQA`) for reply quality. The
 judge routes through the AI Gateway and skips cleanly without credentials, so a
 plain run never errors. `.github/workflows/ci.yml` type-checks every push and PR;
 run `eve eval --strict` in CI when you want soft-threshold misses to fail too.
+
+## GitHub project board
+
+The agent fully controls one GitHub Projects (v2) board — a **copy** of your real
+board, so the original is never touched. It reads and writes that copy:
+`list_work` summarizes current work, `add_work_item` adds draft cards, and
+`set_work_status` moves them (matched by title, so opaque node ids never enter the
+model's context).
+
+It's three small authored tools over the Projects GraphQL API (`lib/github.ts`),
+not a GitHub MCP — a deliberately token-frugal choice, since an MCP pushes a large
+tool surface into context every turn. The `work` skill loads only on demand, and
+`list_work` returns just titles + status. Set `GITHUB_TOKEN` and
+`GITHUB_PROJECT_ID`.
 
 ## Model strategy
 

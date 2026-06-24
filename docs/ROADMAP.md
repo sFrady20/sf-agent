@@ -46,6 +46,9 @@ The "remembering things throughout the day" problem.
 
 ## 💻 Dev & freelance
 
+- ✅ GitHub project board: the agent controls a copy of your board (`list_work` /
+  `add_work_item` / `set_work_status`); the original stays untouched. Token-frugal
+  authored GraphQL tools, not an MCP.
 - 💡 GitHub channel — @mention the agent on PRs/issues; review with checkout.
 - 💡 Linear channel for project delegation.
 - ✅ Freelance ops (`freelance` skill): client intake, milestones, recurring
