@@ -40,6 +40,7 @@ agent/
     read_email.ts         Read one email's body.
     send_email.ts         Send email (approval-gated).
     modify_email.ts       Archive / mark read / unread.
+    remind_me.ts          Delayed reminder via the home Pi worker.
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
@@ -125,6 +126,7 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `_REFRESH_TOKEN` | Gmail (OAuth user token) |
 | `GMAIL_PUBSUB_TOPIC` | Pub/Sub topic for `users.watch` |
 | `GMAIL_PUSH_SECRET` | Guards the Gmail push + watch endpoints |
+| `PI_WORKER_URL` / `PI_WORKER_SECRET` | Home Pi worker (Tailscale Funnel) for delayed jobs |
 
 ## Extending
 
@@ -267,6 +269,18 @@ memory in sync, and only pings when something is time-sensitive:
 
 Set the OAuth trio plus `GMAIL_PUBSUB_TOPIC`, `GMAIL_PUSH_SECRET`, and optionally
 `EMAIL_TRIAGE_MODEL`.
+
+## Remote compute (home worker)
+
+Some work doesn't fit a serverless function — arbitrary-delay reminders, long-
+running or interactive jobs. Those go to an always-on worker on a home Raspberry
+Pi ([sf-pi-worker](https://github.com/sFrady20/sf-pi-worker)), reached over
+**Tailscale Funnel** (a stable public HTTPS URL) and gated by `PI_WORKER_SECRET`.
+
+The `remind_me` tool POSTs a job to the worker; the worker holds the timer and
+pings Telegram when it fires. The job protocol is typed and extensible (today just
+`reminder`), so new long-running job types are added on the worker side without
+touching the agent's serverless limits.
 
 ## Model strategy
 

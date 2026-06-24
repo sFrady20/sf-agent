@@ -13,3 +13,5 @@
   time is ambiguous, ask.
 - When a request is fuzzy or multi-step (a trip, an errand chain, a project),
   delegate the breakdown to the `planner` subagent, then help execute it.
+- For "remind me in N minutes/hours", use `remind_me` (it runs on the always-on
+  home worker). For a specific date/time, use `add_task` or `create_calendar_event`.

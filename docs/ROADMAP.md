@@ -83,6 +83,8 @@ The "remembering things throughout the day" problem.
   calendar + tasks + inbox.
 - ✅ Evening review schedule (`evening_review`) — open/overdue tasks + inbox +
   a tomorrow nudge.
+- ✅ Short-fuse timed reminders ("remind me in 55 min") via the always-on home
+  Pi worker (`remind_me` → sf-pi-worker over Tailscale Funnel).
 - 💡 Weekly planning sweep.
 
 ---
