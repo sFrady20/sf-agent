@@ -1,0 +1,80 @@
+// Typed repositories over the Kv seam. Each one owns a key prefix and the
+// JSON (de)serialization for its entity. Tools, schedules, and hooks talk to
+// these, never to raw keys.
+
+import { randomUUID } from "node:crypto";
+import type { Kv } from "./kv.js";
+import type { Fact, Note, Task } from "./types.js";
+
+const now = () => new Date().toISOString();
+
+async function readAll<T>(kv: Kv, prefix: string): Promise<T[]> {
+  const keys = await kv.keys(prefix);
+  const raw = await Promise.all(keys.map((k) => kv.get(k)));
+  return raw.filter((v): v is string => v !== null).map((v) => JSON.parse(v) as T);
+}
+
+export function createNotes(kv: Kv) {
+  const prefix = "note:";
+  return {
+    async add(text: string, tags: string[] = []): Promise<Note> {
+      const note: Note = { id: randomUUID(), text, tags, createdAt: now() };
+      await kv.set(prefix + note.id, JSON.stringify(note));
+      return note;
+    },
+    async list(): Promise<Note[]> {
+      const notes = await readAll<Note>(kv, prefix);
+      return notes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    },
+  };
+}
+
+export function createFacts(kv: Kv) {
+  const prefix = "fact:";
+  return {
+    async set(key: string, value: string): Promise<Fact> {
+      const fact: Fact = { key, value, updatedAt: now() };
+      await kv.set(prefix + key, JSON.stringify(fact));
+      return fact;
+    },
+    async get(key: string): Promise<Fact | null> {
+      const raw = await kv.get(prefix + key);
+      return raw ? (JSON.parse(raw) as Fact) : null;
+    },
+    async all(): Promise<Fact[]> {
+      return readAll<Fact>(kv, prefix);
+    },
+  };
+}
+
+export function createTasks(kv: Kv) {
+  const prefix = "task:";
+  return {
+    async add(input: { title: string; due?: string; recur?: string }): Promise<Task> {
+      const task: Task = {
+        id: randomUUID(),
+        title: input.title,
+        status: "open",
+        due: input.due,
+        recur: input.recur,
+        createdAt: now(),
+      };
+      await kv.set(prefix + task.id, JSON.stringify(task));
+      return task;
+    },
+    async list(opts: { includeCompleted?: boolean } = {}): Promise<Task[]> {
+      const tasks = await readAll<Task>(kv, prefix);
+      const filtered = opts.includeCompleted ? tasks : tasks.filter((t) => t.status === "open");
+      return filtered.sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+    },
+    async complete(id: string): Promise<Task | null> {
+      const raw = await kv.get(prefix + id);
+      if (!raw) return null;
+      const task = JSON.parse(raw) as Task;
+      task.status = "done";
+      task.completedAt = now();
+      await kv.set(prefix + id, JSON.stringify(task));
+      return task;
+    },
+  };
+}
