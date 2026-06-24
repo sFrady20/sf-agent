@@ -1,0 +1,23 @@
+name: Gmail watch renew
+
+# Gmail's push watch expires after 7 days, so renew it daily. Add repo secrets:
+#   GMAIL_WATCH_URL   = https://<your-app>/eve/v1/gmail/watch
+#   GMAIL_PUSH_SECRET = same value as the Vercel GMAIL_PUSH_SECRET env var
+
+on:
+  schedule:
+    - cron: "0 6 * * *" # daily, 06:00 UTC
+  workflow_dispatch: {}
+
+jobs:
+  renew:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Renew Gmail watch
+        env:
+          GMAIL_WATCH_URL: ${{ secrets.GMAIL_WATCH_URL }}
+          GMAIL_PUSH_SECRET: ${{ secrets.GMAIL_PUSH_SECRET }}
+        run: |
+          code=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
+            "$GMAIL_WATCH_URL?token=$GMAIL_PUSH_SECRET")
+          echo "watch endpoint responded: $code"

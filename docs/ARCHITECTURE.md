@@ -19,6 +19,7 @@ agent/
     discord.ts            Slash commands + the bot's presence (owner-gated).
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
     cron.ts               Secret-protected reminder trigger (external cron).
+    gmail.ts              Gmail push (Pub/Sub) + watch-renew endpoints.
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
     list_inbox.ts         List inbox notes with ids.
@@ -35,6 +36,10 @@ agent/
     list_work.ts          List work from the GitHub board.
     add_work_item.ts      Add a card to the GitHub board.
     set_work_status.ts    Move a card on the GitHub board.
+    search_email.ts       Search Gmail.
+    read_email.ts         Read one email's body.
+    send_email.ts         Send email (approval-gated).
+    modify_email.ts       Archive / mark read / unread.
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
@@ -42,6 +47,7 @@ agent/
     freelance.md          Client/project ops.
     gamedev.md            Devlog, backlog, playtests.
     work.md               GitHub board: status + tracking.
+    gmail.md              Email: read, search, triage, send.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
@@ -53,7 +59,10 @@ agent/
     time.ts               Time-zone helpers (local "today", quiet hours).
     reminders.ts          Reminder selection + dedup (used by the cron channel).
     google.ts             Service-account Calendar access (JWT, zero-dep).
+    gmail.ts              Gmail via OAuth refresh token (read/send/manage/watch).
+    email-triage.ts       Pre-filter + cheap model: extract tasks/facts, alert if urgent.
     github.ts             Projects v2 GraphQL (one board, zero-dep).
+    telegram.ts           Direct Bot API send (zero-token pings).
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
 ```
@@ -113,6 +122,9 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `CRON_SECRET` | Bearer secret for `POST /eve/v1/cron/reminders` |
 | `GITHUB_TOKEN` | PAT with Projects read/write |
 | `GITHUB_PROJECT_ID` | The agent's board (a copy of your real board) — node id |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `_REFRESH_TOKEN` | Gmail (OAuth user token) |
+| `GMAIL_PUBSUB_TOPIC` | Pub/Sub topic for `users.watch` |
+| `GMAIL_PUSH_SECRET` | Guards the Gmail push + watch endpoints |
 
 ## Extending
 
@@ -228,6 +240,33 @@ not a GitHub MCP — a deliberately token-frugal choice, since an MCP pushes a l
 tool surface into context every turn. The `work` skill loads only on demand, and
 `list_work` returns just titles + status. Set `GITHUB_TOKEN` and
 `GITHUB_PROJECT_ID`.
+
+## Gmail
+
+Gmail uses **OAuth** (a user refresh token), not the Calendar service account — a
+service account can't reach a personal inbox. `lib/gmail.ts` refreshes the access
+token and calls the Gmail REST API; tools are `search_email`, `read_email`,
+`send_email` (approval-gated — sending is irreversible), and `modify_email`.
+
+**Real-time processing** runs through the `gmail` channel, not polling — and it
+doesn't ping per email (you already see mail arrive). It quietly keeps tasks and
+memory in sync, and only pings when something is time-sensitive:
+
+- Gmail publishes mailbox changes to a Pub/Sub topic; Pub/Sub push-delivers to
+  `POST /eve/v1/gmail/push?token=<GMAIL_PUSH_SECRET>`. The push carries only a
+  `historyId`, so the webhook fetches the delta and dedupes per message.
+- **Free spam/bulk barrier first** (no model): skips Gmail's Promotions / Social /
+  Updates / Forums / Spam categories and mailing-list mail (`List-Unsubscribe`,
+  `Precedence: bulk`).
+- For what's left, **one cheap structured model call** (`lib/email-triage.ts`,
+  Haiku by default) extracts to-dos + durable facts into the store and judges
+  time-sensitivity. Code applies the updates; a plain Telegram ping
+  (`lib/telegram.ts`, no agent turn) fires **only** if it's time-sensitive.
+- `users.watch` expires after 7 days, so `POST /eve/v1/gmail/watch` renews it,
+  driven daily by `.github/workflows/gmail-watch.yml` (no Vercel cron used).
+
+Set the OAuth trio plus `GMAIL_PUBSUB_TOPIC`, `GMAIL_PUSH_SECRET`, and optionally
+`EMAIL_TRIAGE_MODEL`.
 
 ## Model strategy
 

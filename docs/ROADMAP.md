@@ -37,6 +37,17 @@ The "remembering things throughout the day" problem.
   and the inbox.
 - 💡 Note/link/idea capture with richer retrieval (tags, full-text, embeddings).
 
+## 📧 Email (Gmail)
+
+- ✅ Read / search / triage / send (`search_email` / `read_email` / `modify_email`
+  / `send_email`; send is approval-gated). OAuth refresh token.
+- ✅ Auto-tracking from the inbox: Gmail → Pub/Sub → `gmail` channel → free
+  spam/bulk filter → a cheap model extracts tasks + facts into memory. No
+  per-email pings. Watch renewed daily by GitHub Actions.
+- ✅ Time-sensitive alerts only: a Telegram ping fires solely when triage flags an
+  email as needing soon attention.
+- 💡 Smarter triage: per-sender importance rules, on-demand thread summaries.
+
 ## ✈️ Travel
 
 - ✅ Trip planning skill (`plan_a_trip`) — seeded, weather-aware.
