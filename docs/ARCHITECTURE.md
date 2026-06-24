@@ -18,6 +18,7 @@ agent/
     telegram.ts           Conversational chat (continuous, free-text).
     discord.ts            Slash commands + the bot's presence (owner-gated).
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
+    cron.ts               Secret-protected reminder trigger (external cron).
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
     list_inbox.ts         List inbox notes with ids.
@@ -33,16 +34,16 @@ agent/
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md
-  schedules/            Proactive cron jobs.
+  schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
-    reminder_sweep.ts     Deduped due-task + appointment nudges.
   subagents/            Specialist child agents.
     planner/              Example: decompose a fuzzy goal into a plan.
   lib/                  Shared, import-only code (never enters the sandbox).
     store/                The durable-memory backbone (see below).
     recurrence.ts         Next-due computation for recurring chores.
     time.ts               Time-zone helpers (local "today", quiet hours).
+    reminders.ts          Reminder selection + dedup (used by the cron channel).
     google.ts             Service-account Calendar access (JWT, zero-dep).
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
@@ -100,7 +101,7 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `GOOGLE_CALENDAR_ID` | Calendar to read/write (your email address) |
 | `OWNER_TIMEZONE` | Local tz for reminder "today" + quiet hours |
 | `APPOINTMENT_LEAD_MIN` | Minutes before an event to nudge (default 60) |
-| `REMINDER_SWEEP_CRON` | Override the reminder cadence (plan-dependent) |
+| `CRON_SECRET` | Bearer secret for `POST /eve/v1/cron/reminders` |
 
 ## Extending
 
@@ -148,19 +149,22 @@ own tools/skills as needed.
 
 ## Proactive reminders
 
-Three schedules push to Telegram: `morning_brief` (the day ahead), `evening_review`
-(open work + tomorrow), and `reminder_sweep` — the engine that nudges before
-appointments and when chores/tasks come due. The sweep is non-spammy by design:
+Two Vercel cron schedules push to Telegram daily: `morning_brief` (the day ahead)
+and `evening_review` (open work + tomorrow). Near-time reminders — nudges before
+appointments and when chores/tasks come due — run through the `cron` channel
+instead, because Vercel's Hobby plan rejects sub-daily cron and caps the cron
+count. The selection logic lives in `lib/reminders.ts` and is non-spammy by design:
 
 - **Dedup**: each reminder is keyed (`task:<id>:<due>`, `appt:<id>:<start>`) in the
-  `reminders` store and fires once. This needs KV — without it every sweep
-  re-reminds.
-- **Quiet hours**: it only runs 7am–10pm in `OWNER_TIMEZONE`.
+  `reminders` store and fires once. This needs KV — without it every run re-reminds.
+- **Quiet hours**: it only fires 7am–10pm in `OWNER_TIMEZONE`.
 - **Lead time**: appointments nudge `APPOINTMENT_LEAD_MIN` minutes ahead (default 60).
 
-Cron frequency is plan-sensitive: Vercel Pro runs `*/30` every 30 min; the Hobby
-plan caps cron near once per day. Set `REMINDER_SWEEP_CRON` to match your plan, or
-lean on the daily briefs. All cron is evaluated in UTC.
+`POST /eve/v1/cron/reminders` runs a sweep when called with
+`Authorization: Bearer $CRON_SECRET`. A free external scheduler hits it on a
+cadence — see `.github/workflows/reminders.yml` (GitHub Actions, every 30 min);
+swap in cron-job.org or Upstash QStash if you prefer. This keeps Vercel at two
+cron jobs (Hobby-safe) while still giving near-time reminders.
 
 ## Model strategy
 

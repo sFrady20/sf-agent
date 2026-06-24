@@ -1,0 +1,29 @@
+name: Reminder sweep
+
+# Pings the agent's reminder endpoint so near-time reminders work on Vercel Hobby
+# (which can't run sub-daily cron). Add two repo secrets under
+# Settings -> Secrets and variables -> Actions:
+#   REMINDER_ENDPOINT_URL = https://<your-app>/eve/v1/cron/reminders
+#   CRON_SECRET           = same value as the Vercel CRON_SECRET env var
+#
+# Notes: scheduled workflows run from the default branch, may be delayed a few
+# minutes under GitHub load, and auto-pause after 60 days with no repo activity.
+
+on:
+  schedule:
+    - cron: "*/30 * * * *" # every 30 minutes (UTC)
+  workflow_dispatch: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger reminder sweep
+        env:
+          REMINDER_ENDPOINT_URL: ${{ secrets.REMINDER_ENDPOINT_URL }}
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+        run: |
+          code=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
+            "$REMINDER_ENDPOINT_URL" \
+            -H "Authorization: Bearer $CRON_SECRET")
+          echo "reminder endpoint responded: $code"

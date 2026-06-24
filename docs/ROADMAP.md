@@ -17,8 +17,8 @@ The core pain: planning appointments, recurring chores, and remembering things.
 - ✅ Google Calendar read/write (`list_calendar_events` / `create_calendar_event`)
   via a service account (writes are approval-gated).
 - ✅ Recurring-chore reminders: rollover on completion (`complete_task`) plus
-  scheduled due/overdue nudges via `reminder_sweep`.
-- ✅ Appointment reminders: near-time nudges (`reminder_sweep`) + day-ahead in the
+  due/overdue nudges via the reminder endpoint (GitHub Actions cron).
+- ✅ Appointment reminders: near-time nudges (reminder endpoint) + day-ahead in the
   evening review.
 - 💡 New-baby prep pack: hospital-bag checklist, registry gaps, name shortlist,
   big-sister adjustment ideas, leave/logistics planning.
@@ -82,9 +82,11 @@ The "remembering things throughout the day" problem.
   with recurring rollover), morning + evening proactive schedules, more evals.
   Provision Vercel KV to make persistence durable.
 - **Phase 2 — Calendar & chores** ✅
-  Reminder engine (`reminder_sweep`): deduped, quiet-hours-gated nudges for
-  due/overdue chores and upcoming appointments; evening review now includes the
-  day-ahead. Frequency depends on Vercel plan. Google Tasks still needs OAuth.
+  Reminder engine (`lib/reminders.ts`): deduped, quiet-hours-gated nudges for
+  due/overdue chores and upcoming appointments, exposed at `POST /eve/v1/cron/
+  reminders` (`cron` channel) and driven by a free GitHub Actions cron every 30
+  min — so near-time reminders work on Vercel Hobby. Evening review includes the
+  day-ahead. Google Tasks still needs OAuth.
 - **Phase 3 — Domain packs**
   Extend travel; add DJ / dev / freelance / gamedev as skills + subagents.
 - **Phase 4 — Showcase polish**
