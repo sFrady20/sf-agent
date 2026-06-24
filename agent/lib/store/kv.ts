@@ -67,8 +67,9 @@ class UpstashKv implements Kv {
 let warnedMemoryOnly = false;
 
 export function createKv(): Kv {
-  const url = process.env.KV_REST_API_URL;
-  const token = process.env.KV_REST_API_TOKEN;
+  // Vercel's KV and the Upstash marketplace integration use different env names.
+  const url = process.env.KV_REST_API_URL ?? process.env.UPSTASH_REDIS_REST_URL;
+  const token = process.env.KV_REST_API_TOKEN ?? process.env.UPSTASH_REDIS_REST_TOKEN;
   if (url && token) return new UpstashKv(url, token);
   if (!warnedMemoryOnly) {
     warnedMemoryOnly = true;

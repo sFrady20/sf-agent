@@ -40,26 +40,28 @@ The "remembering things throughout the day" problem.
 ## ✈️ Travel
 
 - ✅ Trip planning skill (`plan_a_trip`) — seeded, weather-aware.
-- 🔜 Family-aware planning: nap schedules, car seats, kid-friendly itineraries,
-  packing lists scaled to "toddler + newborn".
+- ✅ Family-aware travel planning (`plan_a_trip` skill): gentle pacing, naps, car
+  seats, kid packing lists, optional prep tasks + calendar.
 - 💡 Flight/hotel research, check-in and document reminders.
 
 ## 💻 Dev & freelance
 
 - 💡 GitHub channel — @mention the agent on PRs/issues; review with checkout.
 - 💡 Linear channel for project delegation.
-- 💡 Freelance ops: client intake, invoice/payment reminders, time-tracking
-  nudges, weekly project-status digest, deploy monitoring.
+- ✅ Freelance ops (`freelance` skill): client intake, milestones, recurring
+  invoice reminders, project status. (Time-tracking + deploy monitoring later.)
 
 ## 🎛️ DJ / electronic music
 
-- 💡 Crate & set management; harmonic-mixing (key/BPM) suggestions; setlist archive.
+- ✅ Set planning + harmonic mixing (`dj_set` skill + `harmonic_matches` tool);
+  crate ideas via capture.
 - 💡 New-release monitoring for labels/artists → scheduled digest.
-- 💡 Gig logistics + promo/post reminders.
+- ✅ Gig logistics + promo reminders via the `dj_set` skill (tasks).
 
 ## 🎮 Game dev
 
-- 💡 Devlog capture, idea backlog, playtest-feedback intake, asset/task tracking.
+- ✅ Devlog/idea capture, backlog, playtest feedback, scope discipline
+  (`gamedev` skill).
 
 ## 🔔 Proactive layer
 
@@ -87,10 +89,15 @@ The "remembering things throughout the day" problem.
   reminders` (`cron` channel) and driven by a free GitHub Actions cron every 30
   min — so near-time reminders work on Vercel Hobby. Evening review includes the
   day-ahead. Google Tasks still needs OAuth.
-- **Phase 3 — Domain packs**
-  Extend travel; add DJ / dev / freelance / gamedev as skills + subagents.
-- **Phase 4 — Showcase polish**
-  Broader evals, instrumentation, architecture docs, public README.
+- **Phase 3 — Domain packs** ✅
+  Travel rewritten family-aware; `dj_set` (+ `harmonic_matches` tool), `freelance`,
+  and `gamedev` skills added. Packs are skills for now and can graduate to
+  subagents if they need their own tools. (GitHub/Linear channels and new-release
+  monitoring still open.)
+- **Phase 4 — Showcase polish** ✅
+  Broader eval suite (deterministic + LLM-judge), GitHub Actions CI (typecheck),
+  observability documented (Vercel Agent Runs + OTel hook), MIT license, and a
+  showcase README. Live OTel export left as a ready-to-paste hook.
 
 ## Conventions for adding to this backlog
 

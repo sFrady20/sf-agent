@@ -31,9 +31,13 @@ agent/
     complete_task.ts      Finish a task; recurring chores roll forward.
     list_calendar_events.ts    Read Google Calendar.
     create_calendar_event.ts   Write to Google Calendar (approval-gated).
+    harmonic_matches.ts   Camelot-wheel compatible keys (DJ).
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
-    plan_a_trip.md
+    plan_a_trip.md        Family-aware travel planning.
+    dj_set.md             DJ sets, harmonic mixing, crate.
+    freelance.md          Client/project ops.
+    gamedev.md            Devlog, backlog, playtests.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
@@ -165,6 +169,44 @@ count. The selection logic lives in `lib/reminders.ts` and is non-spammy by desi
 cadence — see `.github/workflows/reminders.yml` (GitHub Actions, every 30 min);
 swap in cron-job.org or Upstash QStash if you prefer. This keeps Vercel at two
 cron jobs (Hobby-safe) while still giving near-time reminders.
+
+## Domain packs
+
+Steven's recurring contexts are packaged as on-demand **skills** rather than
+always-on prompt: `plan_a_trip` (family travel), `dj_set` (sets + harmonic mixing,
+backed by the `harmonic_matches` tool), `freelance` (client/project ops), and
+`gamedev` (devlog + backlog). The model loads one only when a request matches its
+description, so they never bloat every turn, and each leans on the shared memory
+and calendar tools. A pack graduates to a subagent only if it needs its own tool
+surface or a distinct role.
+
+## Observability
+
+Deployed on Vercel, eve tags every workflow run with `$eve.*` attributes, so the
+**Agent Runs** tab traces each session → turn → tool call with token usage — no
+`instrumentation.ts` required. To export AI SDK spans to an OpenTelemetry backend
+(Braintrust, Datadog, Honeycomb, …), add `agent/instrumentation.ts`:
+
+```ts title="agent/instrumentation.ts"
+import { defineInstrumentation } from "eve/instrumentation";
+import { registerOTel } from "@vercel/otel";
+
+export default defineInstrumentation({
+  setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
+});
+```
+
+It runs before agent code, so keep it minimal and install the exporter you use.
+Set `recordInputs` / `recordOutputs` to `false` if spans shouldn't carry message
+content.
+
+## Quality
+
+`evals/` holds `eve eval` checks — deterministic (`completed`, `calledTool`,
+content `includes`) plus one LLM-as-judge (`closedQA`) for reply quality. The
+judge routes through the AI Gateway and skips cleanly without credentials, so a
+plain run never errors. `.github/workflows/ci.yml` type-checks every push and PR;
+run `eve eval --strict` in CI when you want soft-threshold misses to fail too.
 
 ## Model strategy
 
