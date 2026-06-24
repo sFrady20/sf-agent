@@ -19,8 +19,10 @@ bun run typecheck    # type-check the app
 bun run eval         # run the behavior evals
 ```
 
-Set up environment variables from [`.env.example`](.env.example). The agent runs
-with an in-memory store until you add Vercel KV / Upstash credentials.
+Set up environment variables from [`.env.example`](.env.example). **On Vercel you
+must provision Vercel KV / Upstash** and set `KV_REST_API_URL` / `KV_REST_API_TOKEN` —
+the in-memory fallback does not persist across serverless invocations, so the
+agent would forget between messages without it.
 
 ## How it's built
 

@@ -24,4 +24,5 @@ export interface Task {
   recur?: string; // free-form cadence, e.g. "weekly", "every Tuesday"
   createdAt: string;
   completedAt?: string;
+  lastCompletedAt?: string; // recurring chores: last time it was checked off
 }

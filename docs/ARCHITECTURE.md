@@ -20,21 +20,29 @@ agent/
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
+    list_inbox.ts         List inbox notes with ids.
+    delete_note.ts        Remove a handled note.
     recall.ts             Search notes + facts + tasks.
     remember_fact.ts      Save/update durable profile facts.
+    list_facts.ts         List all profile facts.
     add_task.ts           Add a task or recurring chore.
     list_tasks.ts         List open/all tasks.
+    complete_task.ts      Finish a task; recurring chores roll forward.
     list_calendar_events.ts    Read Google Calendar.
     create_calendar_event.ts   Write to Google Calendar (approval-gated).
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md
   schedules/            Proactive cron jobs.
-    morning_brief.ts      Daily brief delivered to Telegram.
+    morning_brief.ts      Morning brief delivered to Telegram.
+    evening_review.ts     Evening review + day-ahead, to Telegram.
+    reminder_sweep.ts     Deduped due-task + appointment nudges.
   subagents/            Specialist child agents.
     planner/              Example: decompose a fuzzy goal into a plan.
   lib/                  Shared, import-only code (never enters the sandbox).
     store/                The durable-memory backbone (see below).
+    recurrence.ts         Next-due computation for recurring chores.
+    time.ts               Time-zone helpers (local "today", quiet hours).
     google.ts             Service-account Calendar access (JWT, zero-dep).
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
@@ -51,10 +59,11 @@ session, so it lives in a small storage layer instead:
 
 - `kv.ts` — a four-method `Kv` seam (`get/set/del/keys`). Backed by Vercel KV /
   Upstash over its REST API when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set
-  (zero extra dependencies, just `fetch`); otherwise an in-memory map for local
-  dev that does **not** persist across restarts.
-- `repositories.ts` — typed repos (`notes`, `facts`, `tasks`) that own their key
-  prefixes and JSON serialization.
+  (zero extra dependencies, just `fetch`); otherwise an in-memory map that does
+  **not** persist across restarts — and on Vercel's serverless runtime it won't
+  survive between invocations, so configure KV before relying on memory there.
+- `repositories.ts` — typed repos (`notes`, `facts`, `tasks`, `reminders`) that
+  own their key prefixes and JSON serialization.
 - `index.ts` — assembles `store` once; import it anywhere:
   `import { store } from "../lib/store/index.js";`
 
@@ -86,9 +95,12 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `OWNER_TELEGRAM_USER_ID` | Restrict the agent to you; also the brief's target |
 | `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` / `DISCORD_BOT_TOKEN` | Discord channel |
 | `OWNER_DISCORD_USER_ID` | Restrict Discord commands to you |
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Durable store (optional) |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Durable store (required on Vercel) |
 | `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google service account |
 | `GOOGLE_CALENDAR_ID` | Calendar to read/write (your email address) |
+| `OWNER_TIMEZONE` | Local tz for reminder "today" + quiet hours |
+| `APPOINTMENT_LEAD_MIN` | Minutes before an event to nudge (default 60) |
+| `REMINDER_SWEEP_CRON` | Override the reminder cadence (plan-dependent) |
 
 ## Extending
 
@@ -133,6 +145,22 @@ comment).
 **Add a specialist** — a folder in `agent/subagents/<id>/` with an `agent.ts`
 that exports a `description`. It inherits nothing from the root, so give it its
 own tools/skills as needed.
+
+## Proactive reminders
+
+Three schedules push to Telegram: `morning_brief` (the day ahead), `evening_review`
+(open work + tomorrow), and `reminder_sweep` — the engine that nudges before
+appointments and when chores/tasks come due. The sweep is non-spammy by design:
+
+- **Dedup**: each reminder is keyed (`task:<id>:<due>`, `appt:<id>:<start>`) in the
+  `reminders` store and fires once. This needs KV — without it every sweep
+  re-reminds.
+- **Quiet hours**: it only runs 7am–10pm in `OWNER_TIMEZONE`.
+- **Lead time**: appointments nudge `APPOINTMENT_LEAD_MIN` minutes ahead (default 60).
+
+Cron frequency is plan-sensitive: Vercel Pro runs `*/30` every 30 min; the Hobby
+plan caps cron near once per day. Set `REMINDER_SWEEP_CRON` to match your plan, or
+lean on the daily briefs. All cron is evaluated in UTC.
 
 ## Model strategy
 

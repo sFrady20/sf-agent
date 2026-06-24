@@ -16,10 +16,10 @@ The core pain: planning appointments, recurring chores, and remembering things.
 - ✅ Recurring chores + tasks (`add_task` / `list_tasks`) with cadence + due dates.
 - ✅ Google Calendar read/write (`list_calendar_events` / `create_calendar_event`)
   via a service account (writes are approval-gated).
-- 🔜 Recurring-chore engine: turn `recur` into real reminders (trash day, HVAC
-  filter, car maintenance, water filters, plants) via schedules.
-- 🔜 Appointment tracking + reminders: pediatrician, dentist, and OB/prenatal
-  appointments (timely with the second baby coming).
+- ✅ Recurring-chore reminders: rollover on completion (`complete_task`) plus
+  scheduled due/overdue nudges via `reminder_sweep`.
+- ✅ Appointment reminders: near-time nudges (`reminder_sweep`) + day-ahead in the
+  evening review.
 - 💡 New-baby prep pack: hospital-bag checklist, registry gaps, name shortlist,
   big-sister adjustment ideas, leave/logistics planning.
 - 💡 Predictive supply reminders (diapers, formula, wipes) from consumption cadence.
@@ -33,7 +33,8 @@ The "remembering things throughout the day" problem.
 
 - ✅ Durable profile facts (`remember_fact`) — doctors, sizes, time zone, accounts.
 - ✅ Cross-store search (`recall`).
-- 🔜 Daily review: "what did I say I'd do?" surfaced each morning.
+- ✅ Daily review via the morning brief; the evening review folds in open tasks
+  and the inbox.
 - 💡 Note/link/idea capture with richer retrieval (tags, full-text, embeddings).
 
 ## ✈️ Travel
@@ -64,7 +65,8 @@ The "remembering things throughout the day" problem.
 
 - ✅ Morning brief schedule (`morning_brief`) — delivers to Telegram; folds in
   calendar + tasks + inbox.
-- 🔜 Evening review (what got done, tomorrow's prep).
+- ✅ Evening review schedule (`evening_review`) — open/overdue tasks + inbox +
+  a tomorrow nudge.
 - 💡 Weekly planning sweep.
 
 ---
@@ -75,13 +77,14 @@ The "remembering things throughout the day" problem.
   Telegram (chat) + Discord (slash) channels, swappable storage layer + memory
   tools, service-account Calendar tools, instructions, model bump, locked-down
   HTTP route, evals harness, docs.
-- **Phase 1 — Capture & recall** 🔜
-  Harden the inbox/facts/tasks flow; wire the durable KV; ship the daily brief
-  and evening review.
-- **Phase 2 — Calendar & chores**
-  Calendar read/write is in (service account). Next: a recurring-chore engine
-  that turns `recur` into reminders, and appointment reminders. Google Tasks
-  would need the OAuth refresh-token route.
+- **Phase 1 — Capture & recall** ✅
+  Full memory CRUD (capture / list_inbox / delete_note, list_facts, complete_task
+  with recurring rollover), morning + evening proactive schedules, more evals.
+  Provision Vercel KV to make persistence durable.
+- **Phase 2 — Calendar & chores** ✅
+  Reminder engine (`reminder_sweep`): deduped, quiet-hours-gated nudges for
+  due/overdue chores and upcoming appointments; evening review now includes the
+  day-ahead. Frequency depends on Vercel plan. Google Tasks still needs OAuth.
 - **Phase 3 — Domain packs**
   Extend travel; add DJ / dev / freelance / gamedev as skills + subagents.
 - **Phase 4 — Showcase polish**

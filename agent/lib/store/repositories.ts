@@ -26,6 +26,12 @@ export function createNotes(kv: Kv) {
       const notes = await readAll<Note>(kv, prefix);
       return notes.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
     },
+    async delete(id: string): Promise<boolean> {
+      const key = prefix + id;
+      if ((await kv.get(key)) === null) return false;
+      await kv.del(key);
+      return true;
+    },
   };
 }
 
@@ -43,6 +49,20 @@ export function createFacts(kv: Kv) {
     },
     async all(): Promise<Fact[]> {
       return readAll<Fact>(kv, prefix);
+    },
+  };
+}
+
+export function createReminders(kv: Kv) {
+  const prefix = "reminded:";
+  return {
+    // Has this exact reminder already fired? Keys are caller-defined and stable,
+    // e.g. `task:<id>:<due>` or `appt:<id>:<start>`.
+    async was(key: string): Promise<boolean> {
+      return (await kv.get(prefix + key)) !== null;
+    },
+    async mark(key: string): Promise<void> {
+      await kv.set(prefix + key, new Date().toISOString());
     },
   };
 }
@@ -66,6 +86,13 @@ export function createTasks(kv: Kv) {
       const tasks = await readAll<Task>(kv, prefix);
       const filtered = opts.includeCompleted ? tasks : tasks.filter((t) => t.status === "open");
       return filtered.sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999"));
+    },
+    async get(id: string): Promise<Task | null> {
+      const raw = await kv.get(prefix + id);
+      return raw ? (JSON.parse(raw) as Task) : null;
+    },
+    async save(task: Task): Promise<void> {
+      await kv.set(prefix + task.id, JSON.stringify(task));
     },
     async complete(id: string): Promise<Task | null> {
       const raw = await kv.get(prefix + id);

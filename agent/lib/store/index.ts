@@ -7,7 +7,7 @@
 // scoped working memory, use defineState from "eve/context" instead.
 
 import { createKv } from "./kv.js";
-import { createFacts, createNotes, createTasks } from "./repositories.js";
+import { createFacts, createNotes, createReminders, createTasks } from "./repositories.js";
 
 const kv = createKv();
 
@@ -16,6 +16,7 @@ export const store = {
   notes: createNotes(kv),
   facts: createFacts(kv),
   tasks: createTasks(kv),
+  reminders: createReminders(kv),
 };
 
 export type Store = typeof store;

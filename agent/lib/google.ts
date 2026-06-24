@@ -95,3 +95,45 @@ export async function calendarFetch(
   }
   return res.json();
 }
+
+export interface CalendarEvent {
+  id?: string;
+  summary: string;
+  start?: string;
+  end?: string;
+  location?: string;
+}
+
+interface RawGoogleEvent {
+  id?: string;
+  summary?: string;
+  location?: string;
+  start?: { dateTime?: string; date?: string };
+  end?: { dateTime?: string; date?: string };
+}
+
+// Shared calendar lister used by both the tool and the reminder sweep.
+export async function listEvents(opts: {
+  timeMin: string;
+  timeMax: string;
+  maxResults?: number;
+}): Promise<CalendarEvent[]> {
+  const params = new URLSearchParams({
+    timeMin: opts.timeMin,
+    timeMax: opts.timeMax,
+    singleEvents: "true",
+    orderBy: "startTime",
+    maxResults: String(opts.maxResults ?? 10),
+  });
+  const data = (await calendarFetch(
+    `/calendars/${encodeURIComponent(calendarId())}/events?${params}`,
+  )) as { items?: RawGoogleEvent[] };
+
+  return (data.items ?? []).map((e) => ({
+    id: e.id,
+    summary: e.summary ?? "(no title)",
+    start: e.start?.dateTime ?? e.start?.date,
+    end: e.end?.dateTime ?? e.end?.date,
+    location: e.location,
+  }));
+}

@@ -1,14 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { calendarFetch, calendarId } from "../lib/google.js";
-
-interface GoogleEvent {
-  id?: string;
-  summary?: string;
-  location?: string;
-  start?: { dateTime?: string; date?: string };
-  end?: { dateTime?: string; date?: string };
-}
+import { listEvents } from "../lib/google.js";
 
 export default defineTool({
   description:
@@ -20,24 +12,11 @@ export default defineTool({
   }),
   async execute({ timeMin, timeMax, maxResults }) {
     const now = Date.now();
-    const params = new URLSearchParams({
+    const events = await listEvents({
       timeMin: timeMin ?? new Date(now).toISOString(),
       timeMax: timeMax ?? new Date(now + 7 * 86_400_000).toISOString(),
-      singleEvents: "true",
-      orderBy: "startTime",
-      maxResults: String(maxResults ?? 10),
+      maxResults,
     });
-    const data = (await calendarFetch(
-      `/calendars/${encodeURIComponent(calendarId())}/events?${params}`,
-    )) as { items?: GoogleEvent[] };
-
-    const events = (data.items ?? []).map((e) => ({
-      id: e.id,
-      summary: e.summary ?? "(no title)",
-      start: e.start?.dateTime ?? e.start?.date,
-      end: e.end?.dateTime ?? e.end?.date,
-      location: e.location,
-    }));
     return { events };
   },
 });
