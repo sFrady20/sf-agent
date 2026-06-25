@@ -61,7 +61,7 @@ export async function collectReminders(): Promise<ReminderResult | null> {
 
 export function reminderMessage(lines: string[]): string {
   return (
-    "Give Steven a brief, friendly reminder about these items. If he replies to " +
+    "Give Steven a brief reminder about these items. If he replies to " +
     "act on one (e.g. finish a task with complete_task), help him.\n\n" +
     lines.join("\n")
   );

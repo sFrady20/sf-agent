@@ -10,7 +10,8 @@ map. For the framework's own guides, read `node_modules/eve/docs/`.
 agent/
   agent.ts              Runtime config (model = claude-sonnet-4.6).
   instructions/         Always-on system prompt, composed alphabetically.
-    00-identity.md        Who the agent is, who Steven is.
+    00-identity.md        Who the agent is ("Computer"), who Steven is.
+    05-voice.md           Tone & persona (sincere + authoritative/ironic, dense, no snark/corny).
     10-behavior.md        Operating rules (proactive capture, confirm side effects).
     20-memory.md          How to use the memory tools.
     30-calendar.md        How to use the calendar tools.

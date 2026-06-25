@@ -19,7 +19,7 @@ export default defineSchedule({
           "overdue (use list_tasks), anything left in the inbox to handle (use " +
           "list_inbox), and a heads-up on tomorrow — tomorrow's calendar (use " +
           "list_calendar_events with tomorrow's date range) and anything due " +
-          "tomorrow. Two to four bullets, encouraging tone.",
+          "tomorrow. Two to four bullets.",
         target: { chatId },
         auth: appAuth,
       }),
