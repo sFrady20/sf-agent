@@ -42,6 +42,7 @@ agent/
     send_email.ts         Send email (approval-gated).
     modify_email.ts       Archive / mark read / unread.
     remind_me.ts          Delayed reminder via the home Pi worker.
+    lights.ts             Control home-lab LIFX lighting (via the Pi).
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
@@ -286,6 +287,11 @@ The `remind_me` tool POSTs a job to the worker; the worker holds the timer and
 pings Telegram when it fires. The job protocol is typed and extensible (today just
 `reminder`), so new long-running job types are added on the worker side without
 touching the agent's serverless limits.
+
+The worker also runs a **cooperative LIFX lighting daemon** on the LAN: time-of-day
+scenes, gentle hue drift, and a taste config (per-light brightness, avoided colors)
+— and it backs off any bulb you've changed by hand until the next authoritative
+scene (morning/evening). The `lights` tool drives and tunes it.
 
 ## Model strategy
 
