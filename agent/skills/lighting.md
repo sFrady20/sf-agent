@@ -13,6 +13,9 @@ driven by the `lights` tool.
 - A theme you set **holds** until Steven says otherwise — use action `auto` to hand
   control back to the automatic time-of-day schedule.
 - Use action `scene` only when he names morning / day / evening / night.
+- To change the **automatic** theme for a time window going forward (e.g. "make the
+  night auto-theme green"), design the colors and use action `set_scene_look` with
+  the scene name — it persists.
 - `on` / `off` toggle power; `flash` is a quick notification pulse; `enable` /
   `disable` turn the whole system on or off; `tune` adjusts taste (per-light
   brightness, exclude a light, avoid red).

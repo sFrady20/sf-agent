@@ -6,9 +6,21 @@ import { z } from "zod";
 // "auto" resumes the schedule. The daemon won't fight bulbs changed by hand.
 export default defineTool({
   description:
-    "Control the home-lab ambient lighting (LIFX, via the Pi). For a mood/color/vibe request, design a theme: action 'theme' with 2-4 colors and a brightness you choose (it holds until you run action 'auto'). Other actions: 'scene' (a named morning/day/evening/night look), 'on'/'off', 'flash' (notification pulse), 'enable'/'disable' the system, 'tune' (per-light brightness, exclude a light, avoid red), 'status'. It's color-first and won't override lights changed by hand.",
+    "Control the home-lab ambient lighting (LIFX, via the Pi). For a mood/color/vibe request, design a theme: action 'theme' with 2-4 colors and a brightness you choose (it holds until you run action 'auto'). Other actions: 'scene' (apply a named morning/day/evening/night look), 'set_scene_look' (permanently redefine a scene's auto theme with new colors/brightness), 'on'/'off', 'flash' (notification pulse), 'enable'/'disable' the system, 'tune' (per-light brightness, exclude a light, avoid red), 'status'. It's color-first and won't override lights changed by hand.",
   inputSchema: z.object({
-    action: z.enum(["status", "theme", "auto", "scene", "on", "off", "flash", "enable", "disable", "tune"]),
+    action: z.enum([
+      "status",
+      "theme",
+      "auto",
+      "scene",
+      "set_scene_look",
+      "on",
+      "off",
+      "flash",
+      "enable",
+      "disable",
+      "tune",
+    ]),
     colors: z
       .array(z.object({ hue: z.number().min(0).max(360), saturation: z.number().min(0).max(100) }))
       .optional()
@@ -57,6 +69,17 @@ export default defineTool({
         path = "/lighting/scene";
         method = "POST";
         body = JSON.stringify({ scene: input.scene });
+        break;
+      case "set_scene_look":
+        path = "/lighting/scene-look";
+        method = "POST";
+        body = JSON.stringify({
+          scene: input.scene,
+          palette: input.colors,
+          brightness: input.brightness,
+          white: input.white,
+          kelvin: input.kelvin,
+        });
         break;
       case "on":
       case "off":
