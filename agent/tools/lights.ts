@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { remoteWorkerConfigured, workerFetch } from "../lib/remote.js";
 
 // Drives the cooperative LIFX lighting daemon on the home Pi. For a mood/vibe
 // request, DESIGN a theme (pick colors) with action "theme" — it holds until
@@ -36,12 +37,9 @@ export default defineTool({
     avoidRed: z.boolean().optional(),
   }),
   async execute(input) {
-    const url = process.env.PI_WORKER_URL;
-    const secret = process.env.PI_WORKER_SECRET;
-    if (!url || !secret) {
+    if (!remoteWorkerConfigured()) {
       return { error: "Home worker not configured: set PI_WORKER_URL and PI_WORKER_SECRET." };
     }
-    const base = url.replace(/\/$/, "");
 
     let path = "/lighting";
     let method = "GET";
@@ -111,11 +109,7 @@ export default defineTool({
     }
 
     try {
-      const res = await fetch(`${base}${path}`, {
-        method,
-        headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-        body,
-      });
+      const res = await workerFetch(path, { method, body });
       if (!res.ok) return { error: `Worker ${res.status}: ${await res.text()}` };
       return await res.json();
     } catch (e) {
