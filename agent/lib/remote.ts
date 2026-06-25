@@ -22,3 +22,20 @@ export async function scheduleRemoteReminder(
   if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
   return (await res.json()) as { id: string; fireAt: string };
 }
+
+export async function schedulePresenceReminder(
+  message: string,
+  trigger: "home" | "away",
+): Promise<void> {
+  const url = process.env.PI_WORKER_URL;
+  const secret = process.env.PI_WORKER_SECRET;
+  if (!url || !secret) {
+    throw new Error("Home worker not configured (PI_WORKER_URL / PI_WORKER_SECRET).");
+  }
+  const res = await fetch(`${url.replace(/\/$/, "")}/jobs`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ type: "presence", message, trigger }),
+  });
+  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+}

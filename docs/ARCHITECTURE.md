@@ -21,6 +21,7 @@ agent/
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
     cron.ts               Secret-protected reminder trigger (external cron).
     gmail.ts              Gmail push (Pub/Sub) + watch-renew endpoints.
+    presence.ts           Home/away updates from the Pi (records a fact).
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
     list_inbox.ts         List inbox notes with ids.
@@ -42,6 +43,7 @@ agent/
     send_email.ts         Send email (approval-gated).
     modify_email.ts       Archive / mark read / unread.
     remind_me.ts          Delayed reminder via the home Pi worker.
+    remind_when.ts        Reminder on getting home / leaving (presence).
     lights.ts             Control home-lab LIFX lighting (via the Pi).
     get_weather.ts        Demo tool used by the trip skill.
   skills/               On-demand procedures (loaded when relevant).
@@ -131,6 +133,7 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `GMAIL_PUBSUB_TOPIC` | Pub/Sub topic for `users.watch` |
 | `GMAIL_PUSH_SECRET` | Guards the Gmail push + watch endpoints |
 | `PI_WORKER_URL` / `PI_WORKER_SECRET` | Home Pi worker (Tailscale Funnel) for delayed jobs |
+| `PRESENCE_SECRET` | Guards `POST /eve/v1/presence` (home/away from the Pi) |
 
 ## Extending
 
@@ -294,6 +297,10 @@ time-of-day scenes, gentle drift, and a taste config (per-light brightness, avoi
 colors). The agent can also design a custom **theme** that holds until resumed, and
 it backs off any bulb you've changed by hand until the next authoritative scene. The
 `lights` tool drives and tunes it.
+
+It also runs a **presence monitor** (`ip monitor neigh`) watching Steven's phone on
+the LAN. Arrivals/departures fire `remind_when` reminders to Telegram and POST to
+the agent's `presence` channel, which records a `home_status` fact the agent can read.
 
 ## Model strategy
 
