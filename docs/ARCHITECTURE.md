@@ -62,9 +62,10 @@ agent/
     reminders.ts          Reminder selection + dedup (used by the cron channel).
     google.ts             Service-account Calendar access (JWT, zero-dep).
     gmail.ts              Gmail via OAuth refresh token (read/send/manage/watch).
-    email-triage.ts       Pre-filter + cheap model: extract tasks/facts, alert if urgent.
+    email-triage.ts       Cheap model decides per email: notify / tasks / facts / reminders.
     github.ts             Projects v2 GraphQL (one board, zero-dep).
     telegram.ts           Direct Bot API send (zero-token pings).
+    remote.ts             Dispatch jobs to the home Pi worker.
 evals/                  Scored behavior checks (eve eval).
 docs/                   This folder.
 ```
@@ -262,9 +263,12 @@ memory in sync, and only pings when something is time-sensitive:
   Updates / Forums / Spam categories and mailing-list mail (`List-Unsubscribe`,
   `Precedence: bulk`).
 - For what's left, **one cheap structured model call** (`lib/email-triage.ts`,
-  Haiku by default) extracts to-dos + durable facts into the store and judges
-  time-sensitivity. Code applies the updates; a plain Telegram ping
-  (`lib/telegram.ts`, no agent turn) fires **only** if it's time-sensitive.
+  Haiku by default) **decides what to do** with the actions it has: record tasks,
+  save durable facts, set a timed reminder (via the Pi worker), and/or message
+  Steven on Telegram. It's conservative about interrupting (he already sees his
+  email). It does not auto-reply or write to the calendar — those become tasks.
+  Code applies the chosen actions; the Telegram message (no agent turn) fires only
+  when the model decides to notify. It's not a full agent loop, so it stays cheap.
 - `users.watch` expires after 7 days, so `POST /eve/v1/gmail/watch` renews it,
   driven daily by `.github/workflows/gmail-watch.yml` (no Vercel cron used).
 

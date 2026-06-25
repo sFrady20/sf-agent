@@ -1,5 +1,6 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
+import { remoteWorkerConfigured, scheduleRemoteReminder } from "../lib/remote.js";
 
 // Hands a short-fuse, delayed reminder to the always-on home worker (a Raspberry
 // Pi reachable over Tailscale Funnel). Vercel functions are too short-lived to
@@ -12,24 +13,12 @@ export default defineTool({
     in_minutes: z.number().positive().describe("Minutes from now until the reminder fires."),
   }),
   async execute({ message, in_minutes }) {
-    const url = process.env.PI_WORKER_URL;
-    const secret = process.env.PI_WORKER_SECRET;
-    if (!url || !secret) {
+    if (!remoteWorkerConfigured()) {
       return { error: "Home worker not configured: set PI_WORKER_URL and PI_WORKER_SECRET." };
     }
     try {
-      const res = await fetch(`${url.replace(/\/$/, "")}/jobs`, {
-        method: "POST",
-        headers: { Authorization: `Bearer ${secret}`, "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "reminder",
-          message,
-          delaySeconds: Math.round(in_minutes * 60),
-        }),
-      });
-      if (!res.ok) return { error: `Worker ${res.status}: ${await res.text()}` };
-      const data = (await res.json()) as { id: string; fireAt: string };
-      return { scheduled: true, message, fireAt: data.fireAt };
+      const { fireAt } = await scheduleRemoteReminder(message, in_minutes);
+      return { scheduled: true, message, fireAt };
     } catch (e) {
       return { error: (e as Error).message };
     }
