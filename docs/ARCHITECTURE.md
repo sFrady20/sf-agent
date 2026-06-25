@@ -51,6 +51,7 @@ agent/
     gamedev.md            Devlog, backlog, playtests.
     work.md               GitHub board: status + tracking.
     gmail.md              Email: read, search, triage, send.
+    lighting.md           Home-lab lighting themes + tuning.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
@@ -288,10 +289,11 @@ pings Telegram when it fires. The job protocol is typed and extensible (today ju
 `reminder`), so new long-running job types are added on the worker side without
 touching the agent's serverless limits.
 
-The worker also runs a **cooperative LIFX lighting daemon** on the LAN: time-of-day
-scenes, gentle hue drift, and a taste config (per-light brightness, avoided colors)
-— and it backs off any bulb you've changed by hand until the next authoritative
-scene (morning/evening). The `lights` tool drives and tunes it.
+The worker also runs a **cooperative LIFX lighting daemon** on the LAN: color-first
+time-of-day scenes, gentle drift, and a taste config (per-light brightness, avoided
+colors). The agent can also design a custom **theme** that holds until resumed, and
+it backs off any bulb you've changed by hand until the next authoritative scene. The
+`lights` tool drives and tunes it.
 
 ## Model strategy
 
