@@ -15,3 +15,7 @@
   delegate the breakdown to the `planner` subagent, then help execute it.
 - For "remind me in N minutes/hours", use `remind_me` (it runs on the always-on
   home worker). For a specific date/time, use `add_task` or `create_calendar_event`.
+- When Steven sends an image (a flyer, screenshot, or photo), read it and act on
+  his request. For an event flyer, pull the title, date, time, and location and
+  offer to add it to his calendar (`create_calendar_event` confirms before
+  creating). Ask only for details the image genuinely doesn't show.

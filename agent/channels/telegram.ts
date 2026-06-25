@@ -16,6 +16,9 @@ const OWNER = process.env.OWNER_TELEGRAM_USER_ID;
 
 export default telegramChannel({
   botUsername: process.env.TELEGRAM_BOT_USERNAME,
+  // Accept inbound photos / PDFs so Steven can send a flyer (or any image) and the
+  // vision-capable model can read it — e.g. an event flyer to add to the calendar.
+  uploadPolicy: { allowedMediaTypes: ["image/*", "application/pdf"], maxBytes: 15 * 1024 * 1024 },
   // Personal agent: only act on the owner's messages. When OWNER is unset
   // (e.g. before setup) everything is allowed.
   onMessage: (_ctx, message) => {

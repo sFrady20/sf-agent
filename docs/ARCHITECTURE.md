@@ -16,7 +16,7 @@ agent/
     20-memory.md          How to use the memory tools.
     30-calendar.md        How to use the calendar tools.
   channels/             How you reach the agent.
-    telegram.ts           Conversational chat (continuous, free-text).
+    telegram.ts           Conversational chat + inbound images (vision).
     discord.ts            Slash commands + the bot's presence (owner-gated).
     eve.ts                Default HTTP API, locked to localDev + vercelOidc.
     cron.ts               Secret-protected reminder trigger (external cron).
