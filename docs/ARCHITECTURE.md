@@ -26,6 +26,7 @@ agent/
     capture.ts            Quick-capture inbox.
     list_inbox.ts         List inbox notes with ids.
     delete_note.ts        Remove a handled note.
+    current_time.ts       Authoritative local time (host clock + DST-aware offset).
     recall.ts             Search notes + facts + tasks.
     remember_fact.ts      Save/update durable profile facts.
     list_facts.ts         List all profile facts.

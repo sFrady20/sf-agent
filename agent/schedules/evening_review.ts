@@ -1,8 +1,8 @@
 import { defineSchedule } from "eve/schedules";
 import telegram from "../channels/telegram.js";
+import { localNow, ownerTimezone } from "../lib/time.js";
 
-// Evening review delivered to Telegram. "0 1 * * *" UTC ≈ 8–9pm US Eastern —
-// adjust to Steven's time zone. eve dev never fires schedules; trigger one with:
+// "0 1 * * *" UTC ≈ 8–9pm US Eastern. Trigger locally with:
 //   curl -X POST http://localhost:3000/eve/v1/dev/schedules/evening_review
 export default defineSchedule({
   cron: "0 1 * * *",
@@ -12,9 +12,12 @@ export default defineSchedule({
       console.warn("[evening_review] set OWNER_TELEGRAM_USER_ID to enable the evening review");
       return;
     }
+    const now = localNow();
+    const tz = ownerTimezone();
     waitUntil(
       receive(telegram, {
         message:
+          `Current time: ${now} (${tz}). ` +
           "Evening review for Steven: which tasks or chores are still open or " +
           "overdue (use list_tasks), anything left in the inbox to handle (use " +
           "list_inbox), and a heads-up on tomorrow — tomorrow's calendar (use " +
