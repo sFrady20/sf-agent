@@ -14,6 +14,15 @@ export interface Fact {
   updatedAt: string; // ISO 8601
 }
 
+// A travel-timezone override. When set (and not past `until`), it replaces the
+// configured home zone for all time reasoning. Absent = Steven is home.
+export interface Location {
+  timezone: string; // IANA, e.g. "America/Denver"
+  label?: string; // optional place name, e.g. "Denver"
+  until?: string; // ISO date (YYYY-MM-DD); reverts home after this day
+  setAt: string; // ISO 8601
+}
+
 export type TaskStatus = "open" | "done";
 
 export interface Task {

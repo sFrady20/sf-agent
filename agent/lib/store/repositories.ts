@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Kv } from "./kv.js";
-import type { Fact, Note, Task } from "./types.js";
+import type { Fact, Location, Note, Task } from "./types.js";
 
 const now = () => new Date().toISOString();
 
@@ -63,6 +63,24 @@ export function createReminders(kv: Kv) {
     },
     async mark(key: string): Promise<void> {
       await kv.set(prefix + key, new Date().toISOString());
+    },
+  };
+}
+
+export function createLocation(kv: Kv) {
+  const key = "settings:location"; // single value, not a list
+  return {
+    async get(): Promise<Location | null> {
+      const raw = await kv.get(key);
+      return raw ? (JSON.parse(raw) as Location) : null;
+    },
+    async set(input: Omit<Location, "setAt">): Promise<Location> {
+      const loc: Location = { ...input, setAt: now() };
+      await kv.set(key, JSON.stringify(loc));
+      return loc;
+    },
+    async clear(): Promise<void> {
+      await kv.del(key);
     },
   };
 }

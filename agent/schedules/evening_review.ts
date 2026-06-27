@@ -1,6 +1,7 @@
 import { defineSchedule } from "eve/schedules";
 import telegram from "../channels/telegram.js";
-import { localNow, ownerTimezone } from "../lib/time.js";
+import { currentTimezone } from "../lib/location.js";
+import { localNow } from "../lib/time.js";
 
 // "0 1 * * *" UTC ≈ 8–9pm US Eastern. Trigger locally with:
 //   curl -X POST http://localhost:3000/eve/v1/dev/schedules/evening_review
@@ -12,8 +13,8 @@ export default defineSchedule({
       console.warn("[evening_review] set OWNER_TELEGRAM_USER_ID to enable the evening review");
       return;
     }
-    const now = localNow();
-    const tz = ownerTimezone();
+    const tz = await currentTimezone();
+    const now = localNow(tz);
     waitUntil(
       receive(telegram, {
         message:

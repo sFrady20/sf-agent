@@ -1,6 +1,7 @@
 import { defineSchedule } from "eve/schedules";
 import telegram from "../channels/telegram.js";
-import { localNow, ownerTimezone } from "../lib/time.js";
+import { currentTimezone } from "../lib/location.js";
+import { localNow } from "../lib/time.js";
 
 // Vercel evaluates cron in UTC. "0 13 * * *" ≈ 8am US Eastern / 9am during DST.
 // Trigger locally with:
@@ -13,8 +14,8 @@ export default defineSchedule({
       console.warn("[morning_brief] set OWNER_TELEGRAM_USER_ID to enable the daily brief");
       return;
     }
-    const now = localNow();
-    const tz = ownerTimezone();
+    const tz = await currentTimezone();
+    const now = localNow(tz);
     waitUntil(
       receive(telegram, {
         message:

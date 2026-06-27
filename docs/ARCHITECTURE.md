@@ -27,6 +27,7 @@ agent/
     list_inbox.ts         List inbox notes with ids.
     delete_note.ts        Remove a handled note.
     current_time.ts       Authoritative local time (host clock + DST-aware offset).
+    set_location.ts       Set/clear a travel timezone override (auto-expires).
     recall.ts             Search notes + facts + tasks.
     remember_fact.ts      Save/update durable profile facts.
     list_facts.ts         List all profile facts.
@@ -63,7 +64,8 @@ agent/
   lib/                  Shared, import-only code (never enters the sandbox).
     store/                The durable-memory backbone (see below).
     recurrence.ts         Next-due computation for recurring chores.
-    time.ts               Time-zone helpers (local "today", quiet hours).
+    time.ts               Pure tz toolkit (DST-aware offset, local "today", quiet hours).
+    location.ts           Effective tz: travel override (set_location) or home.
     reminders.ts          Reminder selection + dedup (used by the cron channel).
     google.ts             Service-account Calendar access (JWT, zero-dep).
     gmail.ts              Gmail via OAuth refresh token (read/send/manage/watch).

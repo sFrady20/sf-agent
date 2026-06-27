@@ -4,8 +4,9 @@
 // caller's job.
 
 import { googleConfigured, listEvents } from "./google.js";
+import { currentTimezone } from "./location.js";
 import { store } from "./store/index.js";
-import { dateInTz, hourInTz, ownerTimezone } from "./time.js";
+import { dateInTz, hourInTz } from "./time.js";
 
 const ACTIVE_START = 7; // 7am
 const ACTIVE_END = 22; // 10pm
@@ -19,7 +20,7 @@ export async function collectReminders(): Promise<ReminderResult | null> {
   const chatId = process.env.OWNER_TELEGRAM_USER_ID;
   if (!chatId) return null;
 
-  const tz = ownerTimezone();
+  const tz = await currentTimezone();
   const hour = hourInTz(tz);
   if (hour < ACTIVE_START || hour >= ACTIVE_END) return null; // quiet hours
 
