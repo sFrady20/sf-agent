@@ -8,7 +8,7 @@ map. For the framework's own guides, read `node_modules/eve/docs/`.
 
 ```
 agent/
-  agent.ts              Runtime config (model = claude-sonnet-4.6).
+  agent.ts              Runtime config (model = claude-sonnet-5).
   instructions/         Always-on system prompt, composed alphabetically.
     00-identity.md        Who the agent is ("Computer"), who Steven is.
     05-voice.md           Tone & persona (sincere + authoritative/ironic, dense, no snark/corny).
@@ -329,7 +329,7 @@ the agent's `presence` channel, which records a `home_status` fact the agent can
 
 ## Model strategy
 
-Root runs `claude-sonnet-4.6` for planning and reasoning. Push heavy planning to
+Root runs `claude-sonnet-5` for planning and reasoning. Push heavy planning to
 `claude-opus-4.8` and cheap, high-volume subtasks to `claude-haiku-4.5` via a
 subagent. Per-agent model is set in each `agent.ts`.
 

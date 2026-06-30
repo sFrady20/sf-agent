@@ -5,5 +5,5 @@ import { defineAgent } from "eve";
 export default defineAgent({
   description:
     "Break a fuzzy, multi-step goal (a trip, an errand chain, a project) into a concrete, ordered, minimal plan.",
-  model: "anthropic/claude-sonnet-4.6",
+  model: "anthropic/claude-sonnet-5",
 });
