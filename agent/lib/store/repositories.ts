@@ -88,13 +88,19 @@ export function createLocation(kv: Kv) {
 export function createTasks(kv: Kv) {
   const prefix = "task:";
   return {
-    async add(input: { title: string; due?: string; recur?: string }): Promise<Task> {
+    async add(input: {
+      title: string;
+      due?: string;
+      recur?: string;
+      stakes?: "low" | "high";
+    }): Promise<Task> {
       const task: Task = {
         id: randomUUID(),
         title: input.title,
         status: "open",
         due: input.due,
         recur: input.recur,
+        stakes: input.stakes ?? "low",
         createdAt: now(),
       };
       await kv.set(prefix + task.id, JSON.stringify(task));
@@ -113,13 +119,38 @@ export function createTasks(kv: Kv) {
       await kv.set(prefix + task.id, JSON.stringify(task));
     },
     async complete(id: string): Promise<Task | null> {
+      return closeTask(kv, prefix, id, "done");
+    },
+    // Close for any reason: explicit "done", silently "assumed", or a passive
+    // signal ("email" / "calendar"). All recoverable via reopen.
+    async close(id: string, reason: NonNullable<Task["closedReason"]>): Promise<Task | null> {
+      return closeTask(kv, prefix, id, reason);
+    },
+    async reopen(id: string): Promise<Task | null> {
       const raw = await kv.get(prefix + id);
       if (!raw) return null;
       const task = JSON.parse(raw) as Task;
-      task.status = "done";
-      task.completedAt = now();
+      task.status = "open";
+      delete task.completedAt;
+      delete task.closedReason;
       await kv.set(prefix + id, JSON.stringify(task));
       return task;
     },
   };
+}
+
+async function closeTask(
+  kv: Kv,
+  prefix: string,
+  id: string,
+  reason: NonNullable<Task["closedReason"]>,
+): Promise<Task | null> {
+  const raw = await kv.get(prefix + id);
+  if (!raw) return null;
+  const task = JSON.parse(raw) as Task;
+  task.status = "done";
+  task.completedAt = now();
+  task.closedReason = reason;
+  await kv.set(prefix + id, JSON.stringify(task));
+  return task;
 }

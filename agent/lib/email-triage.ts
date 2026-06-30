@@ -1,7 +1,7 @@
 // Background email triage: one cheap structured model call per (pre-filtered)
 // email that DECIDES what to do with the actions available — record tasks, save
-// facts, set a timed reminder, and/or message Steven — instead of only saving
-// tasks. No full agent loop, so it stays cheap and behind the spam filter.
+// facts, set a timed reminder, message Steven, and/or close open tasks the email
+// confirms are done. No full agent loop, so it stays cheap and behind the spam filter.
 
 import { generateObject } from "ai";
 import { z } from "zod";
@@ -31,6 +31,11 @@ const TriageSchema = z.object({
   reminders: z
     .array(z.object({ message: z.string(), inMinutes: z.number().positive() }))
     .describe("Timed reminders the email implies, e.g. 'remind me in an hour'."),
+  completedTaskIndexes: z
+    .array(z.number())
+    .describe(
+      "Indexes of the listed open tasks that THIS email clearly confirms are already done — a receipt, a 'delivered' notice, an appointment confirmation. Only when it's unmistakably the same task. Empty if none.",
+    ),
 });
 
 export interface TriageInput {
@@ -40,24 +45,44 @@ export interface TriageInput {
 }
 
 export async function triageEmail(email: TriageInput, chatId?: string): Promise<void> {
+  const openTasks = (await store.tasks.list()).slice(0, 30);
+  const openBlock = openTasks.length
+    ? `\n\nSteven's open tasks (index: title):\n${openTasks.map((t, i) => `${i}: ${t.title}`).join("\n")}`
+    : "";
+
   const { object } = await generateObject({
     model: TRIAGE_MODEL,
     schema: TriageSchema,
     prompt:
       "You are Computer, Steven's assistant, triaging one email. Decide what to do " +
       "with the actions you have: record tasks, save durable facts, set timed " +
-      "reminders, and/or message him on Telegram. Guidelines:\n" +
+      "reminders, message him on Telegram, and close open tasks this email confirms " +
+      "are done. Guidelines:\n" +
       "- Be conservative about interrupting him: he already sees his own email, so " +
       "notify only when it genuinely warrants it OR the email explicitly asks.\n" +
       "- If the email asks you to notify/ping him, set notify=true with a message — " +
       "do not turn that request into a task.\n" +
       "- You do not send replies or write to his calendar here; if those are needed, " +
-      "record a task instead.\n\n" +
-      `From: ${email.from}\nSubject: ${email.subject}\n\n${email.body.slice(0, 3000)}`,
+      "record a task instead.\n" +
+      "- If this email clearly confirms one of the listed open tasks is already done " +
+      "(a receipt, a delivery, a confirmation), put its index in completedTaskIndexes. " +
+      "Only when it is unmistakably the same task.\n\n" +
+      `From: ${email.from}\nSubject: ${email.subject}\n\n${email.body.slice(0, 3000)}` +
+      openBlock,
   });
 
   for (const t of object.tasks) await store.tasks.add({ title: t.title, due: t.due });
   for (const f of object.facts) await store.facts.set(f.key, f.value);
+
+  // Passive completion: close tasks this email confirms are done.
+  const closed: string[] = [];
+  for (const idx of object.completedTaskIndexes) {
+    const t = openTasks[idx];
+    if (t) {
+      await store.tasks.close(t.id, "email");
+      closed.push(t.title);
+    }
+  }
 
   if (remoteWorkerConfigured()) {
     for (const r of object.reminders) {
@@ -71,5 +96,9 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
 
   if (object.notify && object.notifyMessage && chatId) {
     await sendTelegramMessage(chatId, object.notifyMessage);
+  }
+  // Quiet FYI for passive closes (batched per email), so Steven can object.
+  if (closed.length && chatId) {
+    await sendTelegramMessage(chatId, `✓ Marked done from your email: ${closed.join(", ")}.`);
   }
 }

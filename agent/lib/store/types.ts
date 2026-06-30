@@ -34,4 +34,6 @@ export interface Task {
   createdAt: string;
   completedAt?: string;
   lastCompletedAt?: string; // recurring chores: last time it was checked off
+  stakes?: "low" | "high"; // "high" = consequential; never silently assumed done
+  closedReason?: "done" | "assumed" | "email" | "calendar" | "expired";
 }

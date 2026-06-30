@@ -34,6 +34,7 @@ agent/
     add_task.ts           Add a task or recurring chore.
     list_tasks.ts         List open/all tasks.
     complete_task.ts      Finish a task; recurring chores roll forward.
+    reopen_task.ts        Reopen a task wrongly assumed done.
     list_calendar_events.ts    Read Google Calendar.
     create_calendar_event.ts   Write to Google Calendar (approval-gated).
     harmonic_matches.ts   Camelot-wheel compatible keys (DJ).
@@ -67,6 +68,7 @@ agent/
     time.ts               Pure tz toolkit (DST-aware offset, local "today", quiet hours).
     location.ts           Effective tz: travel override (set_location) or home.
     reminders.ts          Reminder selection + dedup (used by the cron channel).
+    task-reconcile.ts     Assume-done pass: decay overdue, roll recurring.
     google.ts             Service-account Calendar access (JWT, zero-dep).
     gmail.ts              Gmail via OAuth refresh token (read/send/manage/watch).
     email-triage.ts       Cheap model decides per email: notify / tasks / facts / reminders.
@@ -98,6 +100,22 @@ session, so it lives in a small storage layer instead:
 
 Swapping to Postgres or another backend is a one-file change (`kv.ts`) — repos
 and tools don't move.
+
+## Task lifecycle (assume-done)
+
+The project's ethos is to reduce attention, not demand it — so Steven never has to
+tell the agent a task is finished. Tasks decay on their own:
+
+- **Recurring chores** roll forward to their next occurrence once past due.
+- **Low-stakes one-offs** are silently assumed done a day or two after the due date
+  (`TASK_GRACE_DAYS`). **High-stakes** tasks (set on `add_task`) never are — they
+  keep surfacing until handled.
+- **Email correlation**: the triage pass closes any open task an incoming email
+  confirms is done (a receipt, a delivery, a confirmation), with a quiet FYI.
+
+The decay + recurring roll live in `lib/task-reconcile.ts`, run each sweep by the
+`cron` channel before reminders are collected. Every auto-close is recoverable with
+`reopen_task`.
 
 ## Security posture
 
