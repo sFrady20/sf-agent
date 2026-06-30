@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Kv } from "./kv.js";
-import type { Fact, Location, Note, Task } from "./types.js";
+import type { Fact, Location, Note, Task, WorkSchedule } from "./types.js";
 
 const now = () => new Date().toISOString();
 
@@ -78,6 +78,24 @@ export function createLocation(kv: Kv) {
       const loc: Location = { ...input, setAt: now() };
       await kv.set(key, JSON.stringify(loc));
       return loc;
+    },
+    async clear(): Promise<void> {
+      await kv.del(key);
+    },
+  };
+}
+
+export function createWorkSchedule(kv: Kv) {
+  const key = "settings:work_schedule"; // single swappable record
+  return {
+    async get(): Promise<WorkSchedule | null> {
+      const raw = await kv.get(key);
+      return raw ? (JSON.parse(raw) as WorkSchedule) : null;
+    },
+    async set(input: Omit<WorkSchedule, "updatedAt">): Promise<WorkSchedule> {
+      const sched: WorkSchedule = { ...input, updatedAt: now() };
+      await kv.set(key, JSON.stringify(sched));
+      return sched;
     },
     async clear(): Promise<void> {
       await kv.del(key);

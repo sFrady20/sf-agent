@@ -13,6 +13,7 @@ import {
   createNotes,
   createReminders,
   createTasks,
+  createWorkSchedule,
 } from "./repositories.js";
 
 const kv = createKv();
@@ -24,7 +25,18 @@ export const store = {
   tasks: createTasks(kv),
   reminders: createReminders(kv),
   location: createLocation(kv),
+  workSchedule: createWorkSchedule(kv),
 };
 
 export type Store = typeof store;
-export type { Fact, Location, Note, Task, TaskStatus } from "./types.js";
+export type {
+  Fact,
+  Location,
+  Note,
+  Task,
+  TaskStatus,
+  Weekday,
+  WorkException,
+  WorkMeeting,
+  WorkSchedule,
+} from "./types.js";

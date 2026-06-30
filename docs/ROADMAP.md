@@ -60,6 +60,11 @@ The "remembering things throughout the day" problem.
 - ✅ GitHub project board: the agent controls a copy of your board (`list_work` /
   `add_work_item` / `set_work_status`); the original stays untouched. Token-frugal
   authored GraphQL tools, not an MCP.
+- ✅ Day-job work schedule (`set_work_schedule` / `set_work_day` / `work_schedule`):
+  structured, swappable work rhythm — workdays, hours, in-office/remote, standing
+  meetings, plus dated overrides (PTO/WFH). The briefs read it instead of guessing
+  (no more "rest day" on a workday). Deadlines reuse high-stakes tasks. Job-agnostic
+  so a new job is a data reset, not a rewrite. (Profile/links + EOD review later.)
 - 💡 GitHub channel — @mention the agent on PRs/issues; review with checkout.
 - 💡 Linear channel for project delegation.
 - ✅ Freelance ops (`freelance` skill): client intake, milestones, recurring

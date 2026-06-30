@@ -41,6 +41,9 @@ agent/
     list_work.ts          List work from the GitHub board.
     add_work_item.ts      Add a card to the GitHub board.
     set_work_status.ts    Move a card on the GitHub board.
+    set_work_schedule.ts  Set the recurring work rhythm (days/hours/meetings).
+    set_work_day.ts       One-off work-day override (PTO/WFH/holiday).
+    work_schedule.ts      Read the schedule + a day's computed work status.
     search_email.ts       Search Gmail.
     read_email.ts         Read one email's body.
     send_email.ts         Send email (approval-gated).
@@ -54,7 +57,7 @@ agent/
     dj_set.md             DJ sets, harmonic mixing, crate.
     freelance.md          Client/project ops.
     gamedev.md            Devlog, backlog, playtests.
-    work.md               GitHub board: status + tracking.
+    work.md               GitHub board + day-job work schedule.
     gmail.md              Email: read, search, triage, send.
     lighting.md           Home-lab lighting themes + tuning.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
@@ -67,6 +70,7 @@ agent/
     recurrence.ts         Next-due computation for recurring chores.
     time.ts               Pure tz toolkit (DST-aware offset, local "today", quiet hours).
     location.ts           Effective tz: travel override (set_location) or home.
+    work-schedule.ts      Resolve work rhythm per day (weekly pattern + overrides).
     reminders.ts          Reminder selection + dedup (used by the cron channel).
     task-reconcile.ts     Assume-done pass: decay overdue, roll recurring.
     google.ts             Service-account Calendar access (JWT, zero-dep).
