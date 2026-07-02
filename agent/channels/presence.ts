@@ -1,4 +1,5 @@
 import { defineChannel, POST } from "eve/channels";
+import { bearerOrQuery, secretMatches } from "../lib/auth.js";
 import { store } from "../lib/store/index.js";
 
 // The Pi worker POSTs here when Steven's phone joins/leaves home WiFi. We just
@@ -7,11 +8,9 @@ import { store } from "../lib/store/index.js";
 export default defineChannel({
   routes: [
     POST("/eve/v1/presence", async (req) => {
-      const secret = process.env.PRESENCE_SECRET;
-      const provided =
-        new URL(req.url).searchParams.get("token") ||
-        req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
-      if (!secret || provided !== secret) return new Response("unauthorized", { status: 401 });
+      if (!secretMatches(bearerOrQuery(req, "token"), process.env.PRESENCE_SECRET)) {
+        return new Response("unauthorized", { status: 401 });
+      }
 
       const body = (await req.json()) as { state?: string; at?: string };
       if (body.state === "home" || body.state === "away") {

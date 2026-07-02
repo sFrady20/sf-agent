@@ -20,8 +20,9 @@ The core pain: planning appointments, recurring chores, and remembering things.
   due/overdue nudges via the reminder endpoint (GitHub Actions cron).
 - ✅ Appointment reminders: near-time nudges (reminder endpoint) + day-ahead in the
   evening review.
-- 💡 New-baby prep pack: hospital-bag checklist, registry gaps, name shortlist,
-  big-sister adjustment ideas, leave/logistics planning.
+- ✅ New-baby prep pack (`new_baby` skill): hospital bag, home setup, paperwork
+  and leave logistics, big-sister adjustment — anchored to the due date, high
+  stakes on real deadlines.
 - 💡 Predictive supply reminders (diapers, formula, wipes) from consumption cadence.
 - 💡 Meal planning + grocery list generation.
 - 💡 Birthday/gift reminders for family.
@@ -35,7 +36,9 @@ The "remembering things throughout the day" problem.
 - ✅ Cross-store search (`recall`).
 - ✅ Daily review via the morning brief; the evening review folds in open tasks
   and the inbox.
-- 💡 Note/link/idea capture with richer retrieval (tags, full-text, embeddings).
+- ✅ Ranked multi-term recall: query words match independently across notes,
+  facts, and tasks; results sorted by relevance.
+- 💡 Richer retrieval still open: embeddings / semantic search.
 
 ## 📧 Email (Gmail)
 
@@ -46,11 +49,14 @@ The "remembering things throughout the day" problem.
   per-email pings. Watch renewed daily by GitHub Actions.
 - ✅ Time-sensitive alerts only: a Telegram ping fires solely when triage flags an
   email as needing soon attention.
-- 💡 Smarter triage: per-sender importance rules, on-demand thread summaries.
+- ✅ Standing triage rules: the `email_triage_rules` fact (set conversationally)
+  feeds every triage call; triage also sets task stakes and reads HTML-only mail.
+- 💡 On-demand thread summaries.
 
 ## ✈️ Travel
 
-- ✅ Trip planning skill (`plan_a_trip`) — seeded, weather-aware.
+- ✅ Trip planning skill (`plan_a_trip`) — weather-aware via real forecasts
+  (`get_weather`, Open-Meteo, no key).
 - ✅ Family-aware travel planning (`plan_a_trip` skill): gentle pacing, naps, car
   seats, kid packing lists, optional prep tasks + calendar.
 - 💡 Flight/hotel research, check-in and document reminders.
@@ -89,7 +95,8 @@ The "remembering things throughout the day" problem.
 - ✅ Evening review schedule (`evening_review`) — open/overdue tasks + inbox +
   a tomorrow nudge.
 - ✅ Short-fuse timed reminders ("remind me in 55 min") via the always-on home
-  Pi worker (`remind_me` → sf-pi-worker over Tailscale Funnel).
+  Pi worker (`remind_me` → sf-pi-worker over Tailscale Funnel), with
+  `list_reminders` / `cancel_reminder` to review and cancel what's pending.
 - 💡 Weekly planning sweep.
 
 ---

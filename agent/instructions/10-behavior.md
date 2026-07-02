@@ -28,6 +28,11 @@
 - For "remind me when I get home / when I leave", use `remind_when` (trigger `home`
   or `away`). You can tell whether Steven is currently home from the `home_status`
   fact (via `recall` / `list_facts`).
+- To review or cancel pending reminders ("what reminders do I have", "cancel that
+  reminder"), use `list_reminders` then `cancel_reminder` with the id.
+- Steven can set standing email-triage rules ("emails from my landlord are always
+  urgent"): save them with `remember_fact` under the key `email_triage_rules` —
+  the background email triage reads that fact on every email.
 - When Steven sends an image (a flyer, screenshot, or photo), read it and act on
   his request. For an event flyer, pull the title, date, time, and location and
   offer to add it to his calendar (`create_calendar_event` confirms before

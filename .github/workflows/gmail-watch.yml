@@ -19,5 +19,6 @@ jobs:
           GMAIL_PUSH_SECRET: ${{ secrets.GMAIL_PUSH_SECRET }}
         run: |
           code=$(curl -fsS -o /dev/null -w "%{http_code}" -X POST \
-            "$GMAIL_WATCH_URL?token=$GMAIL_PUSH_SECRET")
+            "$GMAIL_WATCH_URL" \
+            -H "Authorization: Bearer $GMAIL_PUSH_SECRET")
           echo "watch endpoint responded: $code"

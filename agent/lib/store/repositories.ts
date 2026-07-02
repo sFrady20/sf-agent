@@ -10,7 +10,7 @@ const now = () => new Date().toISOString();
 
 async function readAll<T>(kv: Kv, prefix: string): Promise<T[]> {
   const keys = await kv.keys(prefix);
-  const raw = await Promise.all(keys.map((k) => kv.get(k)));
+  const raw = await kv.mget(keys);
   return raw.filter((v): v is string => v !== null).map((v) => JSON.parse(v) as T);
 }
 
@@ -55,6 +55,7 @@ export function createFacts(kv: Kv) {
 
 export function createReminders(kv: Kv) {
   const prefix = "reminded:";
+  const TTL = 60 * 86_400; // dedup marks only matter near their date — expire after 60d
   return {
     // Has this exact reminder already fired? Keys are caller-defined and stable,
     // e.g. `task:<id>:<due>` or `appt:<id>:<start>`.
@@ -62,7 +63,10 @@ export function createReminders(kv: Kv) {
       return (await kv.get(prefix + key)) !== null;
     },
     async mark(key: string): Promise<void> {
-      await kv.set(prefix + key, new Date().toISOString());
+      await kv.set(prefix + key, new Date().toISOString(), { ttlSeconds: TTL });
+    },
+    async unmark(key: string): Promise<void> {
+      await kv.del(prefix + key);
     },
   };
 }
@@ -153,6 +157,19 @@ export function createTasks(kv: Kv) {
       delete task.closedReason;
       await kv.set(prefix + id, JSON.stringify(task));
       return task;
+    },
+    // Done tasks older than the retention window are deleted for good — keeps the
+    // store (and includeCompleted listings) from growing forever.
+    async pruneCompleted(olderThanDays: number): Promise<number> {
+      const cutoff = new Date(Date.now() - olderThanDays * 86_400_000).toISOString();
+      let pruned = 0;
+      for (const t of await readAll<Task>(kv, prefix)) {
+        if (t.status === "done" && (t.completedAt ?? t.createdAt) < cutoff) {
+          await kv.del(prefix + t.id);
+          pruned++;
+        }
+      }
+      return pruned;
     },
   };
 }

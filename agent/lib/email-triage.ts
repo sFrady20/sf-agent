@@ -23,7 +23,18 @@ const TriageSchema = z.object({
     .optional()
     .describe("If notify: the message to send. Brief, plainly worded, calm and a touch authoritative."),
   tasks: z
-    .array(z.object({ title: z.string(), due: z.string().optional() }))
+    .array(
+      z.object({
+        title: z.string(),
+        due: z.string().optional().describe("ISO date (YYYY-MM-DD) only when the email states one."),
+        stakes: z
+          .enum(["low", "high"])
+          .optional()
+          .describe(
+            "'high' for consequential items — bills, deadlines, appointments. High-stakes tasks keep surfacing until handled; low-stakes ones are quietly assumed done after their due date.",
+          ),
+      }),
+    )
     .describe("Concrete to-dos implied by the email."),
   facts: z
     .array(z.object({ key: z.string(), value: z.string() }))
@@ -50,6 +61,11 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
     ? `\n\nSteven's open tasks (index: title):\n${openTasks.map((t, i) => `${i}: ${t.title}`).join("\n")}`
     : "";
 
+  // Steven can steer triage conversationally: "remember that emails from my
+  // landlord are always urgent" → a fact under this key feeds every triage call.
+  const rules = await store.facts.get("email_triage_rules");
+  const rulesBlock = rules ? `\nSteven's standing triage rules: ${rules.value}\n` : "";
+
   const { object } = await generateObject({
     model: TRIAGE_MODEL,
     schema: TriageSchema,
@@ -66,12 +82,17 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
       "record a task instead.\n" +
       "- If this email clearly confirms one of the listed open tasks is already done " +
       "(a receipt, a delivery, a confirmation), put its index in completedTaskIndexes. " +
-      "Only when it is unmistakably the same task.\n\n" +
-      `From: ${email.from}\nSubject: ${email.subject}\n\n${email.body.slice(0, 3000)}` +
+      "Only when it is unmistakably the same task.\n" +
+      rulesBlock +
+      `\nFrom: ${email.from}\nSubject: ${email.subject}\n\n${email.body.slice(0, 3000)}` +
       openBlock,
   });
 
-  for (const t of object.tasks) await store.tasks.add({ title: t.title, due: t.due });
+  for (const t of object.tasks) {
+    // Drop a malformed due date rather than storing something unsortable.
+    const due = t.due && /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : undefined;
+    await store.tasks.add({ title: t.title, due, stakes: t.stakes });
+  }
   for (const f of object.facts) await store.facts.set(f.key, f.value);
 
   // Passive completion: close tasks this email confirms are done.

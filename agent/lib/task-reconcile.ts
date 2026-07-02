@@ -6,16 +6,17 @@
 // Everything is recoverable (reopen_task).
 
 import { currentTimezone } from "./location.js";
-import { nextDue } from "./recurrence.js";
+import { nextDueAfter } from "./recurrence.js";
 import { store } from "./store/index.js";
 import { dateInTz } from "./time.js";
 
 const GRACE_DAYS = Number(process.env.TASK_GRACE_DAYS ?? 1);
+const DONE_RETENTION_DAYS = Number(process.env.TASK_DONE_RETENTION_DAYS ?? 90);
 
 const daysOverdue = (due: string, today: string) =>
   Math.round((Date.parse(today) - Date.parse(due)) / 86_400_000);
 
-export async function reconcileTasks(): Promise<{ assumed: number; rolled: number }> {
+export async function reconcileTasks(): Promise<{ assumed: number; rolled: number; pruned: number }> {
   const today = dateInTz(await currentTimezone());
   let assumed = 0;
   let rolled = 0;
@@ -24,13 +25,8 @@ export async function reconcileTasks(): Promise<{ assumed: number; rolled: numbe
     if (!t.due || daysOverdue(t.due, today) <= 0) continue;
 
     if (t.recur) {
-      let due = t.due;
-      for (let i = 0; i < 100 && due <= today; i++) {
-        const n = nextDue(due, t.recur);
-        if (!n || n === due) break;
-        due = n;
-      }
-      if (due !== t.due) {
+      const due = nextDueAfter(t.due, t.recur, today);
+      if (due && due !== t.due) {
         const task = await store.tasks.get(t.id);
         if (task) {
           task.due = due;
@@ -47,5 +43,7 @@ export async function reconcileTasks(): Promise<{ assumed: number; rolled: numbe
       assumed++;
     }
   }
-  return { assumed, rolled };
+
+  const pruned = await store.tasks.pruneCompleted(DONE_RETENTION_DAYS);
+  return { assumed, rolled, pruned };
 }

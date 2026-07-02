@@ -1,8 +1,8 @@
 import { discordChannel } from "eve/channels/discord";
 
-// Primary channel. Discord gives slash commands, buttons (for approvals),
-// modals (for input), and proactive push — everything a personal assistant
-// needs. Set these in your environment (see .env.example):
+// Slash-command surface (Telegram is the main chat channel). Discord gives
+// slash commands, buttons (for approvals), modals (for input), and proactive
+// push. Set these in your environment (see .env.example):
 //   DISCORD_PUBLIC_KEY       verifies inbound interaction signatures
 //   DISCORD_APPLICATION_ID   edits the deferred reply + sends followups
 //   DISCORD_BOT_TOKEN        proactive messages, typing, fallback delivery

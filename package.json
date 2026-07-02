@@ -1,7 +1,7 @@
 {
   "name": "sf-agent",
   "version": "0.0.0",
-  "packageManager": "pnpm@10.12.4",
+  "packageManager": "bun@1.2.13",
   "type": "module",
   "imports": {
     "#*": "./agent/*",
@@ -17,7 +17,7 @@
   "dependencies": {
     "@vercel/connect": "0.2.3",
     "ai": "7.0.0-canary.171",
-    "eve": "latest",
+    "eve": "0.13.3",
     "zod": "4.4.3"
   },
   "devDependencies": {

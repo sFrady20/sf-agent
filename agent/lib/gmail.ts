@@ -71,14 +71,40 @@ function header(msg: GmailMessage, name: string): string {
 
 const decodeB64Url = (data: string) => Buffer.from(data, "base64url").toString("utf8");
 
-function extractBody(payload: GmailMessage["payload"]): string {
+// Crude but effective plain-texting of an HTML body — enough for triage/reading.
+function stripHtml(html: string): string {
+  return html
+    .replace(/<(style|script)[\s\S]*?<\/\1>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+function findPart(payload: GmailMessage["payload"], mimeType: string): string {
   if (!payload) return "";
-  if (payload.mimeType === "text/plain" && payload.body?.data) return decodeB64Url(payload.body.data);
+  if (payload.mimeType === mimeType && payload.body?.data) return decodeB64Url(payload.body.data);
   for (const part of payload.parts ?? []) {
-    const found = extractBody(part);
+    const found = findPart(part, mimeType);
     if (found) return found;
   }
-  return payload.body?.data ? decodeB64Url(payload.body.data) : "";
+  return "";
+}
+
+function extractBody(payload: GmailMessage["payload"]): string {
+  const plain = findPart(payload, "text/plain");
+  if (plain) return plain;
+  // HTML-only mail (most commercial senders): strip tags rather than reading blind.
+  const html = findPart(payload, "text/html");
+  if (html) return stripHtml(html);
+  return payload?.body?.data ? decodeB64Url(payload.body.data) : "";
 }
 
 export interface EmailSummary {
@@ -178,13 +204,37 @@ export async function startWatch(): Promise<{ historyId: string; expiration: str
   })) as { historyId: string; expiration: string };
 }
 
-export async function newInboxMessageIds(startHistoryId: string): Promise<string[]> {
-  const data = (await gmailFetch(
-    `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX`,
-  )) as { history?: Array<{ messagesAdded?: Array<{ message: { id: string } }> }> };
+// New inbox message ids since a history baseline, plus the mailbox's current
+// historyId (the next baseline). Paginates — a big burst can span pages.
+// Throws GmailHistoryExpired when the baseline is too old (Gmail keeps ~a week).
+export class GmailHistoryExpired extends Error {}
+
+export async function newInboxHistory(
+  startHistoryId: string,
+): Promise<{ ids: string[]; historyId?: string }> {
   const ids = new Set<string>();
-  for (const h of data.history ?? []) {
-    for (const a of h.messagesAdded ?? []) ids.add(a.message.id);
-  }
-  return [...ids];
+  let historyId: string | undefined;
+  let pageToken: string | undefined;
+  do {
+    let data: {
+      history?: Array<{ messagesAdded?: Array<{ message: { id: string } }> }>;
+      historyId?: string;
+      nextPageToken?: string;
+    };
+    try {
+      data = await gmailFetch(
+        `/history?startHistoryId=${encodeURIComponent(startHistoryId)}&historyTypes=messageAdded&labelId=INBOX` +
+          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : ""),
+      );
+    } catch (e) {
+      if (/Gmail API 404/.test((e as Error).message)) throw new GmailHistoryExpired();
+      throw e;
+    }
+    for (const h of data.history ?? []) {
+      for (const a of h.messagesAdded ?? []) ids.add(a.message.id);
+    }
+    if (data.historyId) historyId = data.historyId;
+    pageToken = data.nextPageToken;
+  } while (pageToken);
+  return { ids: [...ids], historyId };
 }

@@ -2,6 +2,11 @@
 // Handles the common cases (daily, weekly, biweekly, monthly, yearly, and
 // "every <weekday>"); returns null when the cadence isn't recognized, in which
 // case the caller leaves the task open without advancing it.
+//
+// All math is date-only. Dates are anchored at noon UTC so weekday/day arithmetic
+// can never slip a day over DST or midnight. Callers pass `today` as the owner's
+// local date (dateInTz) — never the raw UTC instant, which is already "tomorrow"
+// during a US evening.
 
 const WEEKDAYS: Record<string, number> = {
   sun: 0,
@@ -15,11 +20,16 @@ const WEEKDAYS: Record<string, number> = {
 
 const toDateOnly = (d: Date) => d.toISOString().slice(0, 10);
 
-export function nextDue(currentDue: string | undefined, recur: string): string | null {
+// Noon-UTC anchor for a YYYY-MM-DD string; null when it doesn't parse.
+function anchor(date: string | undefined): Date | null {
+  if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) return null;
+  const d = new Date(`${date}T12:00:00Z`);
+  return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function nextDue(currentDue: string | undefined, recur: string, today?: string): string | null {
   const r = recur.toLowerCase();
-  let base = currentDue ? new Date(currentDue) : new Date();
-  if (Number.isNaN(base.getTime())) base = new Date();
-  const d = new Date(base);
+  const d = anchor(currentDue) ?? anchor(today) ?? new Date(`${toDateOnly(new Date())}T12:00:00Z`);
 
   const weekday = r.match(/every\s+(sun|mon|tue|wed|thu|fri|sat)/);
   if (weekday) {
@@ -50,4 +60,21 @@ export function nextDue(currentDue: string | undefined, recur: string): string |
     return toDateOnly(d);
   }
   return null;
+}
+
+// Catch-up advance: the next occurrence strictly after `today`, no matter how
+// overdue the chore is. Shared by complete_task and the reconcile sweep so a
+// long-overdue weekly chore never rolls to a date still in the past.
+export function nextDueAfter(
+  currentDue: string | undefined,
+  recur: string,
+  today: string,
+): string | null {
+  let due = nextDue(currentDue, recur, today);
+  for (let i = 0; i < 100 && due !== null && due <= today; i++) {
+    const n = nextDue(due, recur, today);
+    if (!n || n === due) break;
+    due = n;
+  }
+  return due;
 }

@@ -1,5 +1,6 @@
 import { defineChannel, POST } from "eve/channels";
-import { collectReminders, reminderMessage } from "../lib/reminders.js";
+import { bearerOrQuery, secretMatches } from "../lib/auth.js";
+import { collectReminders, markReminded, reminderMessage } from "../lib/reminders.js";
 import { reconcileTasks } from "../lib/task-reconcile.js";
 import telegram from "./telegram.js";
 
@@ -18,11 +19,7 @@ const APP_AUTH = {
 export default defineChannel({
   routes: [
     POST("/eve/v1/cron/reminders", async (req, { receive, waitUntil }) => {
-      const secret = process.env.CRON_SECRET;
-      const provided =
-        req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim() ||
-        new URL(req.url).searchParams.get("secret");
-      if (!secret || provided !== secret) {
+      if (!secretMatches(bearerOrQuery(req, "secret"), process.env.CRON_SECRET)) {
         return new Response("unauthorized", { status: 401 });
       }
 
@@ -37,12 +34,17 @@ export default defineChannel({
       const result = await collectReminders();
       if (!result) return Response.json({ ok: true, delivered: false });
 
+      // Dedup keys are marked only after the turn is dispatched, so a failed
+      // delivery is retried on the next sweep instead of lost.
       waitUntil(
-        receive(telegram, {
-          message: reminderMessage(result.lines),
-          target: { chatId: result.chatId },
-          auth: APP_AUTH,
-        }),
+        (async () => {
+          await receive(telegram, {
+            message: reminderMessage(result.lines),
+            target: { chatId: result.chatId },
+            auth: APP_AUTH,
+          });
+          await markReminded(result.keys);
+        })().catch((e) => console.warn("[cron] reminder delivery failed", e)),
       );
       return Response.json({ ok: true, delivered: true, reminders: result.lines.length });
     }),

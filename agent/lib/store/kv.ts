@@ -1,4 +1,4 @@
-// A tiny key/value seam. The whole storage layer sits on these four methods, so
+// A tiny key/value seam. The whole storage layer sits on these five methods, so
 // swapping the backend is a one-file change.
 //
 // Default: Upstash / Vercel KV over its REST API when KV_REST_API_URL and
@@ -7,24 +7,42 @@
 
 export interface Kv {
   get(key: string): Promise<string | null>;
-  set(key: string, value: string): Promise<void>;
+  /** ttlSeconds: auto-expire the key (for dedup marks and other ephemera). */
+  set(key: string, value: string, opts?: { ttlSeconds?: number }): Promise<void>;
   del(key: string): Promise<void>;
   keys(prefix: string): Promise<string[]>;
+  /** Batched get — one round trip instead of N. Order matches `keys`. */
+  mget(keys: string[]): Promise<(string | null)[]>;
 }
 
 class MemoryKv implements Kv {
-  #map = new Map<string, string>();
-  async get(key: string) {
-    return this.#map.get(key) ?? null;
+  #map = new Map<string, { value: string; expiresAt?: number }>();
+  #live(key: string): string | null {
+    const e = this.#map.get(key);
+    if (!e) return null;
+    if (e.expiresAt && e.expiresAt <= Date.now()) {
+      this.#map.delete(key);
+      return null;
+    }
+    return e.value;
   }
-  async set(key: string, value: string) {
-    this.#map.set(key, value);
+  async get(key: string) {
+    return this.#live(key);
+  }
+  async set(key: string, value: string, opts?: { ttlSeconds?: number }) {
+    this.#map.set(key, {
+      value,
+      expiresAt: opts?.ttlSeconds ? Date.now() + opts.ttlSeconds * 1000 : undefined,
+    });
   }
   async del(key: string) {
     this.#map.delete(key);
   }
   async keys(prefix: string) {
-    return [...this.#map.keys()].filter((k) => k.startsWith(prefix));
+    return [...this.#map.keys()].filter((k) => k.startsWith(prefix) && this.#live(k) !== null);
+  }
+  async mget(keys: string[]) {
+    return keys.map((k) => this.#live(k));
   }
 }
 
@@ -53,14 +71,20 @@ class UpstashKv implements Kv {
   async get(key: string) {
     return (await this.#cmd<string | null>(["GET", key])) ?? null;
   }
-  async set(key: string, value: string) {
-    await this.#cmd(["SET", key, value]);
+  async set(key: string, value: string, opts?: { ttlSeconds?: number }) {
+    const cmd: (string | number)[] = ["SET", key, value];
+    if (opts?.ttlSeconds) cmd.push("EX", opts.ttlSeconds);
+    await this.#cmd(cmd);
   }
   async del(key: string) {
     await this.#cmd(["DEL", key]);
   }
   async keys(prefix: string) {
     return (await this.#cmd<string[]>(["KEYS", `${prefix}*`])) ?? [];
+  }
+  async mget(keys: string[]) {
+    if (keys.length === 0) return [];
+    return (await this.#cmd<(string | null)[]>(["MGET", ...keys])) ?? keys.map(() => null);
   }
 }
 

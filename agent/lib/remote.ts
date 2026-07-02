@@ -55,3 +55,21 @@ export async function schedulePresenceReminder(
   });
   if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
 }
+
+export interface PendingReminders {
+  timed: Array<{ id: string; message: string; fireAt: string }>;
+  presence: Array<{ id: string; message: string; trigger: "home" | "away"; createdAt: string }>;
+}
+
+export async function listRemoteReminders(): Promise<PendingReminders> {
+  const res = await workerFetch("/jobs");
+  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  return (await res.json()) as PendingReminders;
+}
+
+export async function cancelRemoteReminder(id: string): Promise<boolean> {
+  const res = await workerFetch(`/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (res.status === 404) return false;
+  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  return true;
+}

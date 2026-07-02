@@ -1,7 +1,9 @@
 import { defineTool } from "eve/tools";
 import { z } from "zod";
-import { nextDue } from "../lib/recurrence.js";
+import { currentTimezone } from "../lib/location.js";
+import { nextDueAfter } from "../lib/recurrence.js";
 import { store } from "../lib/store/index.js";
+import { dateInTz } from "../lib/time.js";
 
 export default defineTool({
   description:
@@ -13,7 +15,9 @@ export default defineTool({
 
     if (task.recur) {
       task.lastCompletedAt = new Date().toISOString();
-      const next = nextDue(task.due, task.recur);
+      // Catch-up advance so a long-overdue chore rolls to a real future date.
+      const today = dateInTz(await currentTimezone());
+      const next = nextDueAfter(task.due, task.recur, today);
       if (next) {
         task.due = next;
         task.status = "open";

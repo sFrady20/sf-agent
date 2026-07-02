@@ -50,8 +50,10 @@ agent/
     modify_email.ts       Archive / mark read / unread.
     remind_me.ts          Delayed reminder via the home Pi worker.
     remind_when.ts        Reminder on getting home / leaving (presence).
+    list_reminders.ts     Pending timed + presence reminders on the worker.
+    cancel_reminder.ts    Cancel a pending reminder by id.
     lights.ts             Control home-lab LIFX lighting (via the Pi).
-    get_weather.ts        Demo tool used by the trip skill.
+    get_weather.ts        Real weather via Open-Meteo (no key): current + forecast.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
     dj_set.md             DJ sets, harmonic mixing, crate.
@@ -60,6 +62,7 @@ agent/
     work.md               GitHub board + day-job work schedule.
     gmail.md              Email: read, search, triage, send.
     lighting.md           Home-lab lighting themes + tuning.
+    new_baby.md           Second-daughter prep: checklists, leave, logistics.
   schedules/            Proactive cron jobs (2 — Hobby-safe).
     morning_brief.ts      Morning brief delivered to Telegram.
     evening_review.ts     Evening review + day-ahead, to Telegram.
@@ -92,11 +95,13 @@ always path-derived — no file sets its own `name`.
 Everything a personal assistant remembers (notes, facts, chores) must outlive the
 session, so it lives in a small storage layer instead:
 
-- `kv.ts` — a four-method `Kv` seam (`get/set/del/keys`). Backed by Vercel KV /
-  Upstash over its REST API when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set
-  (zero extra dependencies, just `fetch`); otherwise an in-memory map that does
-  **not** persist across restarts — and on Vercel's serverless runtime it won't
-  survive between invocations, so configure KV before relying on memory there.
+- `kv.ts` — a five-method `Kv` seam (`get/set/del/keys/mget`; `set` takes an
+  optional TTL for ephemera like dedup marks). Backed by Vercel KV / Upstash over
+  its REST API when `KV_REST_API_URL` + `KV_REST_API_TOKEN` are set (zero extra
+  dependencies, just `fetch`); otherwise an in-memory map that does **not**
+  persist across restarts — and on Vercel's serverless runtime it won't survive
+  between invocations, so configure KV before relying on memory there. Lists read
+  via one batched `MGET`, not a round trip per key.
 - `repositories.ts` — typed repos (`notes`, `facts`, `tasks`, `reminders`) that
   own their key prefixes and JSON serialization.
 - `index.ts` — assembles `store` once; import it anywhere:
@@ -119,7 +124,10 @@ tell the agent a task is finished. Tasks decay on their own:
 
 The decay + recurring roll live in `lib/task-reconcile.ts`, run each sweep by the
 `cron` channel before reminders are collected. Every auto-close is recoverable with
-`reopen_task`.
+`reopen_task`. Done tasks are deleted for good after `TASK_DONE_RETENTION_DAYS`
+(default 90) so the store never grows unbounded. All recurrence math runs in
+Steven's local day (never raw UTC), and rolling a long-overdue chore catches up
+to the next genuinely future date.
 
 ## Security posture
 
@@ -151,6 +159,7 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `GOOGLE_CALENDAR_ID` | Calendar to read/write (your email address) |
 | `OWNER_TIMEZONE` | Local tz for reminder "today" + quiet hours |
 | `APPOINTMENT_LEAD_MIN` | Minutes before an event to nudge (default 60) |
+| `TASK_DONE_RETENTION_DAYS` | Days to keep completed tasks before pruning (default 90) |
 | `CRON_SECRET` | Bearer secret for `POST /eve/v1/cron/reminders` |
 | `GITHUB_TOKEN` | PAT with Projects read/write |
 | `GITHUB_PROJECT_ID` | The agent's board (a copy of your real board) — node id |
@@ -213,8 +222,12 @@ instead, because Vercel's Hobby plan rejects sub-daily cron and caps the cron
 count. The selection logic lives in `lib/reminders.ts` and is non-spammy by design:
 
 - **Dedup**: each reminder is keyed (`task:<id>:<due>`, `appt:<id>:<start>`) in the
-  `reminders` store and fires once. This needs KV — without it every run re-reminds.
-- **Quiet hours**: it only fires 7am–10pm in `OWNER_TIMEZONE`.
+  `reminders` store and fires once. Keys are marked only after the message is
+  actually dispatched (a failed send retries next sweep) and expire after 60 days.
+  This needs KV — without it every run re-reminds.
+- **Quiet hours**: it only fires 7am–10pm in `OWNER_TIMEZONE`. The last active-hour
+  sweep also flags events starting during quiet hours or before the first morning
+  sweep + lead ("Early tomorrow"), since their lead window falls inside quiet hours.
 - **Lead time**: appointments nudge `APPOINTMENT_LEAD_MIN` minutes ahead (default 60).
 
 `POST /eve/v1/cron/reminders` runs a sweep when called with
@@ -227,8 +240,9 @@ cron jobs (Hobby-safe) while still giving near-time reminders.
 
 Steven's recurring contexts are packaged as on-demand **skills** rather than
 always-on prompt: `plan_a_trip` (family travel), `dj_set` (sets + harmonic mixing,
-backed by the `harmonic_matches` tool), `freelance` (client/project ops), and
-`gamedev` (devlog + backlog). The model loads one only when a request matches its
+backed by the `harmonic_matches` tool), `freelance` (client/project ops),
+`gamedev` (devlog + backlog), and `new_baby` (second-daughter prep: checklists,
+leave, logistics). The model loads one only when a request matches its
 description, so they never bloat every turn, and each leans on the shared memory
 and calendar tools. A pack graduates to a subagent only if it needs its own tool
 surface or a distinct role.
@@ -288,17 +302,25 @@ memory in sync, and only pings when something is time-sensitive:
 
 - Gmail publishes mailbox changes to a Pub/Sub topic; Pub/Sub push-delivers to
   `POST /eve/v1/gmail/push?token=<GMAIL_PUSH_SECRET>`. The push carries only a
-  `historyId`, so the webhook fetches the delta and dedupes per message.
+  `historyId`, so the webhook fetches the delta (paginated) and dedupes per
+  message. The stored baseline advances only after a successful sweep, so a
+  transient failure retries instead of dropping mail; an expired baseline
+  (Gmail keeps ~a week) resets with a warning. HTML-only mail is tag-stripped
+  so triage isn't blind to it.
 - **Free spam/bulk barrier first** (no model): skips Gmail's Promotions / Social /
   Updates / Forums / Spam categories and mailing-list mail (`List-Unsubscribe`,
   `Precedence: bulk`).
 - For what's left, **one cheap structured model call** (`lib/email-triage.ts`,
-  Haiku by default) **decides what to do** with the actions it has: record tasks,
+  Haiku by default) **decides what to do** with the actions it has: record tasks
+  (with stakes — a bill or deadline is marked high so it never silently decays),
   save durable facts, set a timed reminder (via the Pi worker), and/or message
   Steven on Telegram. It's conservative about interrupting (he already sees his
   email). It does not auto-reply or write to the calendar — those become tasks.
   Code applies the chosen actions; the Telegram message (no agent turn) fires only
   when the model decides to notify. It's not a full agent loop, so it stays cheap.
+  Standing rules ("emails from my landlord are always urgent") live in the
+  `email_triage_rules` fact — set conversationally via `remember_fact` — and feed
+  every triage call.
 - `users.watch` expires after 7 days, so `POST /eve/v1/gmail/watch` renews it,
   driven daily by `.github/workflows/gmail-watch.yml` (no Vercel cron used).
 
@@ -313,9 +335,10 @@ Pi ([sf-pi-worker](https://github.com/sFrady20/sf-pi-worker)), reached over
 **Tailscale Funnel** (a stable public HTTPS URL) and gated by `PI_WORKER_SECRET`.
 
 The `remind_me` tool POSTs a job to the worker; the worker holds the timer and
-pings Telegram when it fires. The job protocol is typed and extensible (today just
-`reminder`), so new long-running job types are added on the worker side without
-touching the agent's serverless limits.
+pings Telegram when it fires (a failed send retries — reminders are never lost).
+`list_reminders` / `cancel_reminder` manage what's pending. The job protocol is
+typed and extensible, so new long-running job types are added on the worker side
+without touching the agent's serverless limits.
 
 The worker also runs a **cooperative LIFX lighting daemon** on the LAN: color-first
 time-of-day scenes, gentle drift, and a taste config (per-light brightness, avoided
