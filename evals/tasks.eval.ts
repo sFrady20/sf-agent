@@ -5,11 +5,11 @@ export default defineEval({
   description: "Adds a task and lists it back.",
   async test(t) {
     await t.send("Add a task: call the dentist, due 2026-07-10.");
-    t.completed();
+    t.succeeded();
     t.calledTool("add_task").soft();
 
     await t.send("What tasks do I have?");
-    t.completed();
+    t.succeeded();
     t.calledTool("list_tasks").soft();
   },
 });

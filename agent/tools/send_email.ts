@@ -13,7 +13,7 @@ export default defineTool({
     subject: z.string(),
     body: z.string(),
   }),
-  needsApproval: always(),
+  approval: always(),
   async execute({ to, subject, body }) {
     if (!gmailConfigured()) {
       return { error: "Gmail not configured: set GOOGLE_OAUTH_CLIENT_ID/SECRET/REFRESH_TOKEN." };

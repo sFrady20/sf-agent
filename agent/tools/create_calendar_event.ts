@@ -26,7 +26,7 @@ export default defineTool({
         "IANA timezone the wall-clock time is in, e.g. 'America/Los_Angeles'. Defaults to Steven's current timezone.",
       ),
   }),
-  needsApproval: once(),
+  approval: once(),
   async execute({ summary, start, end, description, location, timezone }) {
     const tz = timezone ?? (await currentTimezone());
     if (!isValidTimeZone(tz)) {

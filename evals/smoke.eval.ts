@@ -7,7 +7,7 @@ export default defineEval({
   description: "The agent boots and captures a reminder to memory.",
   async test(t) {
     await t.send("Remember that trash goes out Tuesday night.");
-    t.completed();
+    t.succeeded();
     t.calledTool("capture").soft();
   },
 });
