@@ -7,12 +7,14 @@ import { remoteWorkerConfigured, workerFetch } from "../lib/remote.js";
 // "auto" resumes the schedule. The daemon won't fight bulbs changed by hand.
 export default defineTool({
   description:
-    "Control the home-lab ambient lighting (LIFX, via the Pi). For a mood/color/vibe request, design a theme: action 'theme' with 2-4 colors and a brightness you choose (it holds until you run action 'auto'). Other actions: 'scene' (apply a named morning/day/evening/night look), 'set_scene_look' (permanently redefine a scene's auto theme with new colors/brightness), 'on'/'off', 'flash' (notification pulse), 'enable'/'disable' the system, 'tune' (per-light brightness, exclude a light, avoid red), 'status'. It's color-first and won't override lights changed by hand.",
+    "Control the home-lab ambient lighting (LIFX, via the Pi). For a mood/color/vibe request, design a theme: action 'theme' with 2-4 colors and a brightness you choose (it holds until you run action 'auto'). Action 'party' takes over ALL lights with fast color changes and occasional flashes (options: intensity 1-10, colors, brightness); 'party_stop' restores every light to its pre-party state. Other actions: 'scene' (apply a named morning/day/evening/night look), 'set_scene_look' (permanently redefine a scene's auto theme with new colors/brightness), 'on'/'off', 'flash' (notification pulse), 'enable'/'disable' the system, 'tune' (per-light brightness, exclude a light, avoid red), 'status'. It's color-first and (outside party mode) won't override lights changed by hand.",
   inputSchema: z.object({
     action: z.enum([
       "status",
       "theme",
       "auto",
+      "party",
+      "party_stop",
       "scene",
       "set_scene_look",
       "on",
@@ -22,11 +24,18 @@ export default defineTool({
       "disable",
       "tune",
     ]),
+    intensity: z
+      .number()
+      .int()
+      .min(1)
+      .max(10)
+      .optional()
+      .describe("For 'party': 1 chill pulse … 10 full rave (default 5). Drives tempo and flash frequency."),
     colors: z
       .array(z.object({ hue: z.number().min(0).max(360), saturation: z.number().min(0).max(100) }))
       .optional()
-      .describe("For 'theme': 2-4 colors you design for the vibe. Avoid red unless asked."),
-    brightness: z.number().min(1).max(100).optional().describe("For 'theme': overall brightness."),
+      .describe("For 'theme' or 'party': 2-4 colors you design for the vibe. Avoid red unless asked (party mode may use it freely). Omit for 'party' to use the full spectrum."),
+    brightness: z.number().min(1).max(100).optional().describe("For 'theme' or 'party': overall brightness."),
     drift: z.boolean().optional().describe("For 'theme': slowly cycle the colors over time (default true)."),
     white: z.boolean().optional().describe("For 'theme': warm white instead of color (rare)."),
     kelvin: z.number().min(1500).max(9000).optional(),
@@ -60,6 +69,20 @@ export default defineTool({
         break;
       case "auto":
         path = "/lighting/auto";
+        method = "POST";
+        body = "{}";
+        break;
+      case "party":
+        path = "/lighting/party";
+        method = "POST";
+        body = JSON.stringify({
+          intensity: input.intensity,
+          palette: input.colors,
+          brightness: input.brightness,
+        });
+        break;
+      case "party_stop":
+        path = "/lighting/party/stop";
         method = "POST";
         body = "{}";
         break;

@@ -344,7 +344,10 @@ The worker also runs a **cooperative LIFX lighting daemon** on the LAN: color-fi
 time-of-day scenes, gentle drift, and a taste config (per-light brightness, avoided
 colors). The agent can also design a custom **theme** that holds until resumed, and
 it backs off any bulb you've changed by hand until the next authoritative scene. The
-`lights` tool drives and tunes it.
+`lights` tool drives and tunes it. **Party mode** (`party` / `party_stop`) is the one
+exception to cooperation: it snapshots every light, takes them all over — fast color
+changes with occasional flashes, tunable intensity 1–10 and palette — and restores
+the exact pre-party state on stop.
 
 It also runs a **presence monitor** (`ip monitor neigh`) watching Steven's phone on
 the LAN. Arrivals/departures fire `remind_when` reminders to Telegram and POST to

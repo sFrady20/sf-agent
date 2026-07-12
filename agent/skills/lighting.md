@@ -12,6 +12,12 @@ driven by the `lights` tool.
   if asked. Avoid red unless asked.
 - A theme you set **holds** until Steven says otherwise — use action `auto` to hand
   control back to the automatic time-of-day schedule.
+- For **party mode** ("party lights", "make it a rave"), use action `party`. It takes
+  over every light — even ones changed by hand — with fast color changes and occasional
+  flashes. Tune it with `intensity` (1 chill … 10 rave; default 5), optional `colors`
+  (omit for full spectrum — red is fair game here), and `brightness`. Calling `party`
+  again while it's running just retunes it. Action `party_stop` ends it and restores
+  every light to exactly how it was before the party.
 - Use action `scene` only when he names morning / day / evening / night.
 - To change the **automatic** theme for a time window going forward (e.g. "make the
   night auto-theme green"), design the colors and use action `set_scene_look` with
