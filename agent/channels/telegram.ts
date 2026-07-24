@@ -14,8 +14,25 @@ import { telegramChannel } from "eve/channels/telegram";
 
 const OWNER = process.env.OWNER_TELEGRAM_USER_ID;
 
+// Telegram's file CDN serves photo downloads as application/octet-stream, and
+// eve (≤0.27.3) lets that header override the declared type (image/jpeg), so
+// the upload policy rejects its own photo and the turn dies. Stripping the
+// non-committal header makes eve fall back to the declared media type.
+const stripVagueContentType: typeof fetch = async (input, init) => {
+  const res = await fetch(input, init);
+  const url =
+    typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+  if (!res.ok || !url.includes("api.telegram.org/file/")) return res;
+  const type = res.headers.get("content-type");
+  if (type && type !== "application/octet-stream") return res;
+  const headers = new Headers(res.headers);
+  headers.delete("content-type");
+  return new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+};
+
 export default telegramChannel({
   botUsername: process.env.TELEGRAM_BOT_USERNAME,
+  api: { fetch: stripVagueContentType },
   // Accept inbound photos / PDFs so Steven can send a flyer (or any image) and the
   // vision-capable model can read it — e.g. an event flyer to add to the calendar.
   uploadPolicy: { allowedMediaTypes: ["image/*", "application/pdf"], maxBytes: 15 * 1024 * 1024 },
