@@ -22,6 +22,7 @@ agent/
     cron.ts               Secret-protected reminder trigger (external cron).
     gmail.ts              Gmail push (Pub/Sub) + watch-renew endpoints.
     presence.ts           Home/away updates from the Pi (records a fact).
+    discord-ingest.ts     Batched Discord messages from the Pi's gateway listener → triage.
   tools/                Typed actions the model can call.
     capture.ts            Quick-capture inbox.
     list_inbox.ts         List inbox notes with ids.
@@ -53,6 +54,8 @@ agent/
     list_reminders.ts     Pending timed + presence reminders on the worker.
     cancel_reminder.ts    Cancel a pending reminder by id.
     lights.ts             Control home-lab LIFX lighting (via the Pi).
+    check_parking.ts      One-shot parking-camera check (Wyze cam via the Pi).
+    watch_parking.ts      Timed parking watch on the Pi; Telegram ping when a spot opens.
     get_weather.ts        Real weather via Open-Meteo (no key): current + forecast.
   skills/               On-demand procedures (loaded when relevant).
     plan_a_trip.md        Family-aware travel planning.
@@ -79,6 +82,7 @@ agent/
     google.ts             Service-account Calendar access (JWT, zero-dep).
     gmail.ts              Gmail via OAuth refresh token (read/send/manage/watch).
     email-triage.ts       Cheap model decides per email: notify / tasks / facts / reminders.
+    discord-triage.ts     Same idea per Discord batch (fed by the Pi's gateway listener).
     github.ts             Projects v2 GraphQL (one board, zero-dep).
     telegram.ts           Direct Bot API send (zero-token pings).
     remote.ts             Dispatch jobs to the home Pi worker.
@@ -168,6 +172,8 @@ See `.env.example`. Pull deployed values with `vercel env pull`.
 | `GMAIL_PUSH_SECRET` | Guards the Gmail push + watch endpoints |
 | `PI_WORKER_URL` / `PI_WORKER_SECRET` | Home Pi worker (Tailscale Funnel) for delayed jobs |
 | `PRESENCE_SECRET` | Guards `POST /eve/v1/presence` (home/away from the Pi) |
+| `DISCORD_INGEST_SECRET` | Guards `POST /eve/v1/discord/ingest` (message batches from the Pi) |
+| `DISCORD_TRIAGE_MODEL` | Optional cheap model for Discord triage (falls back to `EMAIL_TRIAGE_MODEL`) |
 
 ## Extending
 
@@ -352,6 +358,39 @@ the exact pre-party state on stop.
 It also runs a **presence monitor** (`ip monitor neigh`) watching Steven's phone on
 the LAN. Arrivals/departures fire `remind_when` reminders to Telegram and POST to
 the agent's `presence` channel, which records a `home_status` fact the agent can read.
+
+The worker also fronts the **parking camera**: a Wyze cam reached through
+[docker-wyze-bridge](https://github.com/mrlt8/docker-wyze-bridge) on the LAN
+(unofficial — grab a free API key/id from Wyze's developer portal; see the
+worker's `deploy/wyze-bridge.compose.yml`). The worker pulls a JPEG frame and
+runs one cheap vision call (Haiku, direct Anthropic key or AI Gateway key) that
+returns `{open, total, detail}`. `check_parking` asks once; `watch_parking`
+starts a timed watch on the Pi that re-checks every couple of minutes and pings
+Telegram the moment a spot opens (stopping by default). Watches are in-memory —
+a Pi restart simply ends one.
+
+Finally, it holds the **Discord gateway listener** (see below).
+
+## Discord ingestion
+
+The Discord channel on Vercel is HTTP Interactions only — slash commands in,
+no passive reading. Autonomous ingestion needs a persistent Gateway WebSocket
+with the privileged *Message Content* intent, which a serverless function can't
+hold — so the Pi worker holds it (`src/discord/gateway.ts`, zero-dep raw
+WebSocket with heartbeat/resume). It watches server messages and DMs (skipping
+bots, optionally filtered to `DISCORD_WATCH_CHANNELS`), buffers them, and
+forwards a batch every ~60s to `POST /eve/v1/discord/ingest` guarded by
+`DISCORD_INGEST_SECRET`.
+
+The agent side mirrors Gmail: no per-message agent turns. One cheap structured
+call per batch (`lib/discord-triage.ts`) decides — record tasks, save facts, set
+Pi reminders, close tasks the chatter confirms done, and ping Telegram only when
+someone genuinely needs Steven. His own messages are labeled so commitments he
+makes get captured but never ping him. Standing rules live in the
+`discord_triage_rules` fact, set conversationally. Batches are deduped by id, so
+a worker retry never double-processes. Enable the *Message Content Intent* in
+the Discord Developer Portal (Bot → Privileged Gateway Intents) or the gateway
+closes with code 4014.
 
 ## Model strategy
 

@@ -16,8 +16,8 @@
   },
   "dependencies": {
     "@vercel/connect": "0.2.3",
-    "ai": "7.0.0-canary.171",
-    "eve": "0.22.5",
+    "ai": "^7.0.34",
+    "eve": "0.27.3",
     "zod": "4.4.3"
   },
   "devDependencies": {

@@ -72,5 +72,5 @@ export interface Task {
   completedAt?: string;
   lastCompletedAt?: string; // recurring chores: last time it was checked off
   stakes?: "low" | "high"; // "high" = consequential; never silently assumed done
-  closedReason?: "done" | "assumed" | "email" | "calendar" | "expired";
+  closedReason?: "done" | "assumed" | "email" | "discord" | "calendar" | "expired";
 }

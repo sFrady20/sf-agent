@@ -23,6 +23,9 @@ The core pain: planning appointments, recurring chores, and remembering things.
 - ✅ New-baby prep pack (`new_baby` skill): hospital bag, home setup, paperwork
   and leave logistics, big-sister adjustment — anchored to the due date, high
   stakes on real deadlines.
+- ✅ Parking-spot camera (`check_parking` / `watch_parking`): the Pi grabs Wyze
+  frames via docker-wyze-bridge, a cheap vision model counts open spots, and a
+  timed watch pings Telegram when one opens.
 - 💡 Predictive supply reminders (diapers, formula, wipes) from consumption cadence.
 - 💡 Meal planning + grocery list generation.
 - 💡 Birthday/gift reminders for family.
@@ -52,6 +55,16 @@ The "remembering things throughout the day" problem.
 - ✅ Standing triage rules: the `email_triage_rules` fact (set conversationally)
   feeds every triage call; triage also sets task stakes and reads HTML-only mail.
 - 💡 On-demand thread summaries.
+
+## 💬 Discord
+
+- ✅ Slash-command surface (owner-gated) for commands + approvals.
+- ✅ Autonomous message ingestion: the Pi worker holds a gateway WebSocket
+  (Message Content intent), batches server messages/DMs, and forwards them to
+  `POST /eve/v1/discord/ingest`; a cheap triage pass (like email) records
+  tasks/facts/reminders and pings Telegram only when something needs Steven.
+  Standing rules via the `discord_triage_rules` fact.
+- 💡 Replying on Discord from the triage path (currently reply-needed → task).
 
 ## ✈️ Travel
 
