@@ -8,7 +8,7 @@ import { store } from "../lib/store/index.js";
 // instead of requiring the exact phrase.
 export default defineTool({
   description:
-    "Search previously captured notes, saved facts, and tasks. Use this before asking Steven to repeat something he may have already told you. Multiple words match independently and results are ranked by relevance.",
+    "Search previously captured notes, saved facts, tasks, and Discord conversation summaries. Use this before asking Steven to repeat something he may have already told you, and for 'did anyone mention X' questions. Multiple words match independently and results are ranked by relevance.",
   inputSchema: z.object({ query: z.string().min(1) }),
   async execute({ query }) {
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
@@ -23,15 +23,17 @@ export default defineTool({
         .sort((a, b) => b.hits - a.hits)
         .map((r) => r.item);
 
-    const [notes, facts, tasks] = await Promise.all([
+    const [notes, facts, tasks, conversations] = await Promise.all([
       store.notes.list(),
       store.facts.all(),
       store.tasks.list({ includeCompleted: true }),
+      store.conversations.recent({ limit: 100 }),
     ]);
     return {
       notes: rank(notes, (n) => [n.text, n.tags]),
       facts: rank(facts, (f) => [f.key, f.value]),
       tasks: rank(tasks, (t) => [t.title]),
+      conversations: rank(conversations, (c) => [c.summary, c.channel, c.participants]),
     };
   },
 });

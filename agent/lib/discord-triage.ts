@@ -17,13 +17,29 @@ const TriageSchema = z.object({
   notify: z
     .boolean()
     .describe(
-      "Message Steven on Telegram now? Only if something genuinely warrants pulling him in " +
-        "(someone needs him, a decision is blocked on him, time-sensitive news) — not routine chatter.",
+      "Message Steven on Telegram now? The bar: a real person is specifically trying to reach " +
+        "HIM, or he'd be sorry to have missed it within the hour. Never for routine chatter, " +
+        "announcements, or automated/pasted content. Any actions you record below are reported " +
+        "to him automatically — do not notify just to say you recorded something.",
     ),
   notifyMessage: z
     .string()
     .optional()
     .describe("If notify: brief and plainly worded, naming who/where (e.g. '#general')."),
+  channelDigests: z
+    .array(
+      z.object({
+        channel: z.string().describe("Channel name exactly as shown in the transcript, e.g. '#gamedev' or 'DM'."),
+        summary: z
+          .string()
+          .describe("1-2 sentences: what was discussed and any outcome. Coarse topics, not a transcript."),
+        participants: z.array(z.string()).describe("Display names of who was talking."),
+      }),
+    )
+    .describe(
+      "One entry per channel in this batch that had a real conversation, so Steven can later ask " +
+        "what people were talking about and where. Skip channels with only noise or one-off remarks.",
+    ),
   tasks: z
     .array(
       z.object({
@@ -52,6 +68,8 @@ const TriageSchema = z.object({
 
 export interface DiscordTriageMessage {
   channel: string; // "#name" or "DM"
+  channelId: string;
+  guildId?: string;
   author: string;
   authorId: string;
   content: string;
@@ -90,11 +108,13 @@ export async function triageDiscordBatch(
     prompt:
       "You are Computer, Steven's assistant, triaging a batch of Discord messages from " +
       "his servers and DMs. Decide what to do with the actions you have: record tasks, " +
-      "save durable facts, set timed reminders, message him on Telegram, and close open " +
-      "tasks these messages confirm are done. Guidelines:\n" +
-      "- Most chatter needs NO action at all — an empty result is the common case.\n" +
-      "- Be conservative about interrupting him; notify only when someone genuinely " +
-      "needs him or something is time-sensitive.\n" +
+      "save durable facts, set timed reminders, message him on Telegram, keep per-channel " +
+      "conversation digests, and close open tasks these messages confirm are done. Guidelines:\n" +
+      "- Most chatter needs NO action — empty tasks/facts/reminders is the common case; " +
+      "channelDigests is the one thing you fill in whenever real conversation happened.\n" +
+      "- The notify test: is a real PERSON specifically trying to reach Steven (or is he " +
+      "blocking them)? Automated content, bot-style announcements, and general chatter " +
+      "never warrant a ping, however urgent their wording sounds.\n" +
       "- Messages marked '(Steven himself)' are his own — never notify him about those, " +
       "but do capture commitments he makes in them.\n" +
       "- You do not reply on Discord; if a reply is needed, that becomes a task.\n" +
@@ -103,35 +123,58 @@ export async function triageDiscordBatch(
       openBlock,
   });
 
+  // Rolling conversation memory: coarse per-channel digests, not transcripts.
+  for (const digest of object.channelDigests) {
+    const source = messages.find((m) => m.channel === digest.channel);
+    if (!source) continue; // model named a channel that isn't in this batch
+    try {
+      await store.conversations.add({
+        channel: digest.channel,
+        channelId: source.channelId,
+        guildId: source.guildId,
+        summary: digest.summary,
+        participants: digest.participants.slice(0, 10),
+      });
+    } catch (err) {
+      console.warn("[discord-triage] digest save failed", err);
+    }
+  }
+
+  // Apply actions, collecting a report of what *we* did — Steven's standing
+  // rule: tell him what the agent does, not what's happening around him.
+  const actions: string[] = [];
   for (const t of object.tasks) {
     const due = t.due && /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : undefined;
     await store.tasks.add({ title: t.title, due, stakes: t.stakes });
+    actions.push(`+ task: ${t.title}${due ? ` (due ${due})` : ""}`);
   }
-  for (const f of object.facts) await store.facts.set(f.key, f.value);
-
-  const closed: string[] = [];
+  for (const f of object.facts) {
+    await store.facts.set(f.key, f.value);
+    actions.push(`+ fact: ${f.key}`);
+  }
   for (const idx of object.completedTaskIndexes) {
     const t = openTasks[idx];
     if (t) {
       await store.tasks.close(t.id, "discord");
-      closed.push(t.title);
+      actions.push(`✓ closed: ${t.title}`);
     }
   }
-
   if (remoteWorkerConfigured()) {
     for (const r of object.reminders) {
       try {
         await scheduleRemoteReminder(r.message, r.inMinutes);
+        actions.push(`⏰ reminder in ${Math.round(r.inMinutes)}m: ${r.message}`);
       } catch (err) {
         console.warn("[discord-triage] reminder failed", err);
       }
     }
   }
 
-  if (object.notify && object.notifyMessage && chatId) {
-    await sendTelegramMessage(chatId, object.notifyMessage);
-  }
-  if (closed.length && chatId) {
-    await sendTelegramMessage(chatId, `✓ Marked done from Discord: ${closed.join(", ")}.`);
-  }
+  // One ping at most: the human-notify (if warranted) plus the action report.
+  if (!chatId) return;
+  const channels = [...new Set(messages.map((m) => m.channel))].join(", ");
+  const parts: string[] = [];
+  if (object.notify && object.notifyMessage) parts.push(object.notifyMessage);
+  if (actions.length) parts.push(`💬 From Discord (${channels}) I did:\n${actions.join("\n")}`);
+  if (parts.length) await sendTelegramMessage(chatId, parts.join("\n\n"));
 }

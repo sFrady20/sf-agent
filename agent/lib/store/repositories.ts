@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Kv } from "./kv.js";
-import type { Fact, Location, Note, Task, WorkSchedule } from "./types.js";
+import type { ConversationDigest, Fact, Location, Note, Task, WorkSchedule } from "./types.js";
 
 const now = () => new Date().toISOString();
 
@@ -103,6 +103,47 @@ export function createWorkSchedule(kv: Kv) {
     },
     async clear(): Promise<void> {
       await kv.del(key);
+    },
+  };
+}
+
+export function createConversations(kv: Kv) {
+  const prefix = "convo:";
+  const MAX_PER_CHANNEL = 30;
+  const TTL = 30 * 86_400; // quiet channels fade out on their own
+  return {
+    async add(input: Omit<ConversationDigest, "at">): Promise<ConversationDigest> {
+      const entry: ConversationDigest = { ...input, at: now() };
+      const key = prefix + input.channelId;
+      const raw = await kv.get(key);
+      const entries = raw ? (JSON.parse(raw) as ConversationDigest[]) : [];
+      entries.push(entry);
+      await kv.set(key, JSON.stringify(entries.slice(-MAX_PER_CHANNEL)), { ttlSeconds: TTL });
+      return entry;
+    },
+    // Newest-first digests: one channel's history, or everything flattened.
+    async recent(opts: { channelId?: string; limit?: number } = {}): Promise<ConversationDigest[]> {
+      const limit = opts.limit ?? 50;
+      if (opts.channelId) {
+        const raw = await kv.get(prefix + opts.channelId);
+        const entries = raw ? (JSON.parse(raw) as ConversationDigest[]) : [];
+        return entries.reverse().slice(0, limit);
+      }
+      const all = (await readAll<ConversationDigest[]>(kv, prefix)).flat();
+      return all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
+    },
+    // Channel overview: last activity + latest topic per channel, newest first.
+    async channels(): Promise<
+      Array<{ channel: string; channelId: string; lastAt: string; latest: string }>
+    > {
+      const lists = await readAll<ConversationDigest[]>(kv, prefix);
+      return lists
+        .filter((entries) => entries.length > 0)
+        .map((entries) => {
+          const last = entries[entries.length - 1]!;
+          return { channel: last.channel, channelId: last.channelId, lastAt: last.at, latest: last.summary };
+        })
+        .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
     },
   };
 }

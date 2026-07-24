@@ -60,6 +60,20 @@ export interface WorkSchedule {
   updatedAt: string; // ISO 8601
 }
 
+// A rolling per-channel summary of Discord chatter, written by background
+// triage. Deliberately coarse — topics + who was talking, not transcripts — so
+// Steven can ask "what were people saying in #gamedev?" without the store
+// swallowing every message. Entries expire on their own (TTL) and are capped
+// per channel.
+export interface ConversationDigest {
+  channel: string; // "#gamedev" or "DM"
+  channelId: string;
+  guildId?: string;
+  summary: string; // 1-2 sentences: topics + outcome
+  participants: string[];
+  at: string; // ISO 8601
+}
+
 export type TaskStatus = "open" | "done";
 
 export interface Task {

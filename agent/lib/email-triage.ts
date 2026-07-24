@@ -16,7 +16,11 @@ const TriageSchema = z.object({
   notify: z
     .boolean()
     .describe(
-      "Message Steven on Telegram now? Only if it genuinely warrants interrupting him (he already sees his own email) OR the email explicitly asks to be notified.",
+      "Message Steven on Telegram now? The test: is a real PERSON specifically trying to reach " +
+        "him, or is this a deadline he'd be sorry to miss? Automated mail — 2FA / 'was this you' " +
+        "sign-in alerts, verification codes, receipts, shipping notices, newsletters — is NEVER " +
+        "worth a ping no matter how urgent its wording sounds; he sees his own inbox. Any actions " +
+        "you record are reported to him automatically — never notify just to say you recorded something.",
     ),
   notifyMessage: z
     .string()
@@ -74,9 +78,12 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
       "with the actions you have: record tasks, save durable facts, set timed " +
       "reminders, message him on Telegram, and close open tasks this email confirms " +
       "are done. Guidelines:\n" +
-      "- Be conservative about interrupting him: he already sees his own email, so " +
-      "notify only when it genuinely warrants it OR the email explicitly asks.\n" +
-      "- If the email asks you to notify/ping him, set notify=true with a message — " +
+      "- The notify test: is a real PERSON specifically trying to reach Steven, or is " +
+      "this a deadline he'd genuinely be sorry to miss? He already sees his own inbox.\n" +
+      "- NEVER notify for automated mail: 2FA / 'was this you' sign-in alerts, " +
+      "verification codes, receipts, shipping updates, newsletters, system status. " +
+      "Their urgent wording ('if this wasn't you, act now') is boilerplate, not urgency.\n" +
+      "- If a real sender asks you to notify/ping him, set notify=true with a message — " +
       "do not turn that request into a task.\n" +
       "- You do not send replies or write to his calendar here; if those are needed, " +
       "record a task instead.\n" +
@@ -88,38 +95,45 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
       openBlock,
   });
 
+  // Apply actions, collecting a report of what *we* did — Steven's standing
+  // rule: tell him what the agent does, not what's happening in his inbox.
+  const actions: string[] = [];
   for (const t of object.tasks) {
     // Drop a malformed due date rather than storing something unsortable.
     const due = t.due && /^\d{4}-\d{2}-\d{2}$/.test(t.due) ? t.due : undefined;
     await store.tasks.add({ title: t.title, due, stakes: t.stakes });
+    actions.push(`+ task: ${t.title}${due ? ` (due ${due})` : ""}`);
   }
-  for (const f of object.facts) await store.facts.set(f.key, f.value);
-
+  for (const f of object.facts) {
+    await store.facts.set(f.key, f.value);
+    actions.push(`+ fact: ${f.key}`);
+  }
   // Passive completion: close tasks this email confirms are done.
-  const closed: string[] = [];
   for (const idx of object.completedTaskIndexes) {
     const t = openTasks[idx];
     if (t) {
       await store.tasks.close(t.id, "email");
-      closed.push(t.title);
+      actions.push(`✓ closed: ${t.title}`);
     }
   }
-
   if (remoteWorkerConfigured()) {
     for (const r of object.reminders) {
       try {
         await scheduleRemoteReminder(r.message, r.inMinutes);
+        actions.push(`⏰ reminder in ${Math.round(r.inMinutes)}m: ${r.message}`);
       } catch (err) {
         console.warn("[email-triage] reminder failed", err);
       }
     }
   }
 
-  if (object.notify && object.notifyMessage && chatId) {
-    await sendTelegramMessage(chatId, object.notifyMessage);
+  // One ping at most: the human-notify (if warranted) plus the action report.
+  if (!chatId) return;
+  const sender = email.from.replace(/<[^>]*>/, "").trim() || email.from;
+  const parts: string[] = [];
+  if (object.notify && object.notifyMessage) parts.push(object.notifyMessage);
+  if (actions.length) {
+    parts.push(`📧 From "${email.subject}" (${sender}) I did:\n${actions.join("\n")}`);
   }
-  // Quiet FYI for passive closes (batched per email), so Steven can object.
-  if (closed.length && chatId) {
-    await sendTelegramMessage(chatId, `✓ Marked done from your email: ${closed.join(", ")}.`);
-  }
+  if (parts.length) await sendTelegramMessage(chatId, parts.join("\n\n"));
 }

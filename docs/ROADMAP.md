@@ -50,8 +50,10 @@ The "remembering things throughout the day" problem.
 - ✅ Auto-tracking from the inbox: Gmail → Pub/Sub → `gmail` channel → free
   spam/bulk filter → a cheap model extracts tasks + facts into memory. No
   per-email pings. Watch renewed daily by GitHub Actions.
-- ✅ Time-sensitive alerts only: a Telegram ping fires solely when triage flags an
-  email as needing soon attention.
+- ✅ Human-only alerts: a Telegram ping fires only when a real person is trying
+  to reach Steven or a deadline would hurt to miss — automated mail (2FA
+  "was this you", receipts, newsletters) never pings. Actions triage takes
+  (tasks/facts/reminders/closes) are reported in one compact message.
 - ✅ Standing triage rules: the `email_triage_rules` fact (set conversationally)
   feeds every triage call; triage also sets task stakes and reads HTML-only mail.
 - 💡 On-demand thread summaries.
@@ -62,8 +64,14 @@ The "remembering things throughout the day" problem.
 - ✅ Autonomous message ingestion: the Pi worker holds a gateway WebSocket
   (Message Content intent), batches server messages/DMs, and forwards them to
   `POST /eve/v1/discord/ingest`; a cheap triage pass (like email) records
-  tasks/facts/reminders and pings Telegram only when something needs Steven.
+  tasks/facts/reminders and pings Telegram only when a real person needs Steven.
   Standing rules via the `discord_triage_rules` fact.
+- ✅ Action-report pings: every triage that does something tells Steven what it
+  did (one compact Telegram message) — the agent reports its own actions, not
+  the news. Automated content (2FA-style alerts, bots) never notifies.
+- ✅ Conversation memory: rolling per-channel digests (capped + TTL'd) readable
+  via `discord_recap` and searchable via `recall` — "what were people talking
+  about in #gamedev, and where?" without storing transcripts.
 - 💡 Replying on Discord from the triage path (currently reply-needed → task).
 
 ## ✈️ Travel

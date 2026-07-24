@@ -29,7 +29,8 @@ agent/
     delete_note.ts        Remove a handled note.
     current_time.ts       Authoritative local time (host clock + DST-aware offset).
     set_location.ts       Set/clear a travel timezone override (auto-expires).
-    recall.ts             Search notes + facts + tasks.
+    recall.ts             Search notes + facts + tasks + Discord digests.
+    discord_recap.ts      What people were talking about on Discord (per-channel digests).
     remember_fact.ts      Save/update durable profile facts.
     list_facts.ts         List all profile facts.
     add_task.ts           Add a task or recurring chore.
@@ -106,8 +107,11 @@ session, so it lives in a small storage layer instead:
   persist across restarts — and on Vercel's serverless runtime it won't survive
   between invocations, so configure KV before relying on memory there. Lists read
   via one batched `MGET`, not a round trip per key.
-- `repositories.ts` — typed repos (`notes`, `facts`, `tasks`, `reminders`) that
-  own their key prefixes and JSON serialization.
+- `repositories.ts` — typed repos (`notes`, `facts`, `tasks`, `reminders`,
+  `conversations`) that own their key prefixes and JSON serialization.
+  `conversations` holds rolling per-channel Discord digests — capped at 30
+  entries per channel with a 30-day TTL, so heavy chatter can never swamp the
+  store.
 - `index.ts` — assembles `store` once; import it anywhere:
   `import { store } from "../lib/store/index.js";`
 
@@ -320,13 +324,17 @@ memory in sync, and only pings when something is time-sensitive:
   Haiku by default) **decides what to do** with the actions it has: record tasks
   (with stakes — a bill or deadline is marked high so it never silently decays),
   save durable facts, set a timed reminder (via the Pi worker), and/or message
-  Steven on Telegram. It's conservative about interrupting (he already sees his
-  email). It does not auto-reply or write to the calendar — those become tasks.
-  Code applies the chosen actions; the Telegram message (no agent turn) fires only
-  when the model decides to notify. It's not a full agent loop, so it stays cheap.
-  Standing rules ("emails from my landlord are always urgent") live in the
-  `email_triage_rules` fact — set conversationally via `remember_fact` — and feed
-  every triage call.
+  Steven on Telegram. It does not auto-reply or write to the calendar — those
+  become tasks. It's not a full agent loop, so it stays cheap. Standing rules
+  ("emails from my landlord are always urgent") live in the `email_triage_rules`
+  fact — set conversationally via `remember_fact` — and feed every triage call.
+- **Notification philosophy** (same on Discord): report what the *agent did*,
+  never what's happening — Steven already sees his own inbox. Every triage that
+  takes actions sends one compact Telegram report of them (`+ task: …`,
+  `⏰ reminder …`, `✓ closed: …`). A human-notify fires only when a real person
+  is specifically trying to reach him or a deadline would genuinely hurt to
+  miss; automated mail (2FA "was this you", verification codes, receipts,
+  shipping, newsletters) never pings, no matter how urgent its wording sounds.
 - `users.watch` expires after 7 days, so `POST /eve/v1/gmail/watch` renews it,
   driven daily by `.github/workflows/gmail-watch.yml` (no Vercel cron used).
 
@@ -385,12 +393,21 @@ forwards a batch every ~60s to `POST /eve/v1/discord/ingest` guarded by
 The agent side mirrors Gmail: no per-message agent turns. One cheap structured
 call per batch (`lib/discord-triage.ts`) decides — record tasks, save facts, set
 Pi reminders, close tasks the chatter confirms done, and ping Telegram only when
-someone genuinely needs Steven. His own messages are labeled so commitments he
-makes get captured but never ping him. Standing rules live in the
-`discord_triage_rules` fact, set conversationally. Batches are deduped by id, so
-a worker retry never double-processes. Enable the *Message Content Intent* in
-the Discord Developer Portal (Bot → Privileged Gateway Intents) or the gateway
-closes with code 4014.
+a real person is specifically trying to reach Steven (bot/automated content never
+pings). Actions taken are reported in one compact Telegram message (see the
+notification philosophy under Gmail). His own messages are labeled so commitments
+he makes get captured but never ping him. Standing rules live in the
+`discord_triage_rules` fact, set conversationally.
+
+The triage call also writes **conversation digests** — 1-2 sentences per active
+channel (topics, participants, outcome) into the `conversations` store, capped
+and TTL'd so heavy servers can't swamp memory. That's what lets Steven ask
+"what were people talking about in #gamedev?" later: `discord_recap` gives a
+channel overview or per-channel history, `recall` searches digests alongside
+notes/facts/tasks, and the agent points him to the channel for the full thread.
+Batches are deduped by id, so a worker retry never double-processes. Enable the
+*Message Content Intent* in the Discord Developer Portal (Bot → Privileged
+Gateway Intents) or the gateway closes with code 4014.
 
 ## Model strategy
 

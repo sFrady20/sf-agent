@@ -8,6 +8,7 @@
 
 import { createKv } from "./kv.js";
 import {
+  createConversations,
   createFacts,
   createLocation,
   createNotes,
@@ -24,12 +25,14 @@ export const store = {
   facts: createFacts(kv),
   tasks: createTasks(kv),
   reminders: createReminders(kv),
+  conversations: createConversations(kv),
   location: createLocation(kv),
   workSchedule: createWorkSchedule(kv),
 };
 
 export type Store = typeof store;
 export type {
+  ConversationDigest,
   Fact,
   Location,
   Note,
