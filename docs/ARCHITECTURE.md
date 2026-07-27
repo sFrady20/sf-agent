@@ -156,28 +156,28 @@ to the next genuinely future date.
 
 See `.env.example`. Pull deployed values with `vercel env pull`.
 
-| Var | Purpose |
-| --- | --- |
-| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram channel |
-| `OWNER_TELEGRAM_USER_ID` | Restrict the agent to you; also the brief's target |
-| `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` / `DISCORD_BOT_TOKEN` | Discord channel |
-| `OWNER_DISCORD_USER_ID` | Restrict Discord commands to you |
-| `KV_REST_API_URL` / `KV_REST_API_TOKEN` | Durable store (required on Vercel) |
-| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` | Google service account |
-| `GOOGLE_CALENDAR_ID` | Calendar to read/write (your email address) |
-| `OWNER_TIMEZONE` | Local tz for reminder "today" + quiet hours |
-| `APPOINTMENT_LEAD_MIN` | Minutes before an event to nudge (default 60) |
-| `TASK_DONE_RETENTION_DAYS` | Days to keep completed tasks before pruning (default 90) |
-| `CRON_SECRET` | Bearer secret for `POST /eve/v1/cron/reminders` |
-| `GITHUB_TOKEN` | PAT with Projects read/write |
-| `GITHUB_PROJECT_ID` | The agent's board (a copy of your real board) — node id |
-| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `_REFRESH_TOKEN` | Gmail (OAuth user token) |
-| `GMAIL_PUBSUB_TOPIC` | Pub/Sub topic for `users.watch` |
-| `GMAIL_PUSH_SECRET` | Guards the Gmail push + watch endpoints |
-| `PI_WORKER_URL` / `PI_WORKER_SECRET` | Home Pi worker (Tailscale Funnel) for delayed jobs |
-| `PRESENCE_SECRET` | Guards `POST /eve/v1/presence` (home/away from the Pi) |
-| `DISCORD_INGEST_SECRET` | Guards `POST /eve/v1/discord/ingest` (message batches from the Pi) |
-| `DISCORD_TRIAGE_MODEL` | Optional cheap model for Discord triage (falls back to `EMAIL_TRIAGE_MODEL`) |
+| Var                                                                              | Purpose                                                                      |
+| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN` / `TELEGRAM_WEBHOOK_SECRET_TOKEN` / `TELEGRAM_BOT_USERNAME` | Telegram channel                                                             |
+| `OWNER_TELEGRAM_USER_ID`                                                         | Restrict the agent to you; also the brief's target                           |
+| `DISCORD_PUBLIC_KEY` / `DISCORD_APPLICATION_ID` / `DISCORD_BOT_TOKEN`            | Discord channel                                                              |
+| `OWNER_DISCORD_USER_ID`                                                          | Restrict Discord commands to you                                             |
+| `KV_REST_API_URL` / `KV_REST_API_TOKEN`                                          | Durable store (required on Vercel)                                           |
+| `GOOGLE_SERVICE_ACCOUNT_EMAIL` / `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY`            | Google service account                                                       |
+| `GOOGLE_CALENDAR_ID`                                                             | Calendar to read/write (your email address)                                  |
+| `OWNER_TIMEZONE`                                                                 | Local tz for reminder "today" + quiet hours                                  |
+| `APPOINTMENT_LEAD_MIN`                                                           | Minutes before an event to nudge (default 60)                                |
+| `TASK_DONE_RETENTION_DAYS`                                                       | Days to keep completed tasks before pruning (default 90)                     |
+| `CRON_SECRET`                                                                    | Bearer secret for `POST /eve/v1/cron/reminders`                              |
+| `GITHUB_TOKEN`                                                                   | PAT with Projects read/write                                                 |
+| `GITHUB_PROJECT_ID`                                                              | The agent's board (a copy of your real board) — node id                      |
+| `GOOGLE_OAUTH_CLIENT_ID` / `_SECRET` / `_REFRESH_TOKEN`                          | Gmail (OAuth user token)                                                     |
+| `GMAIL_PUBSUB_TOPIC`                                                             | Pub/Sub topic for `users.watch`                                              |
+| `GMAIL_PUSH_SECRET`                                                              | Guards the Gmail push + watch endpoints                                      |
+| `PI_WORKER_URL` / `PI_WORKER_SECRET`                                             | Home Pi worker (Tailscale Funnel) for delayed jobs                           |
+| `PRESENCE_SECRET`                                                                | Guards `POST /eve/v1/presence` (home/away from the Pi)                       |
+| `DISCORD_INGEST_SECRET`                                                          | Guards `POST /eve/v1/discord/ingest` (message batches from the Pi)           |
+| `DISCORD_TRIAGE_MODEL`                                                           | Optional cheap model for Discord triage (falls back to `EMAIL_TRIAGE_MODEL`) |
 
 ## Extending
 
@@ -204,7 +204,7 @@ an access token. To set it up:
 
 1. In Google Cloud (project with the Calendar API enabled), create a **service
    account** and download a JSON key.
-2. In Google Calendar → your calendar's *Settings and sharing* → **Share with
+2. In Google Calendar → your calendar's _Settings and sharing_ → **Share with
    specific people** → add the service account's email with "Make changes to
    events".
 3. Set `GOOGLE_SERVICE_ACCOUNT_EMAIL`, `GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY` (the
@@ -328,7 +328,7 @@ memory in sync, and only pings when something is time-sensitive:
   become tasks. It's not a full agent loop, so it stays cheap. Standing rules
   ("emails from my landlord are always urgent") live in the `email_triage_rules`
   fact — set conversationally via `remember_fact` — and feed every triage call.
-- **Notification philosophy** (same on Discord): report what the *agent did*,
+- **Notification philosophy** (same on Discord): report what the _agent did_,
   never what's happening — Steven already sees his own inbox. Every triage that
   takes actions sends one compact Telegram report of them (`+ task: …`,
   `⏰ reminder …`, `✓ closed: …`). A human-notify fires only when a real person
@@ -383,7 +383,7 @@ Finally, it holds the **Discord gateway listener** (see below).
 
 The Discord channel on Vercel is HTTP Interactions only — slash commands in,
 no passive reading. Autonomous ingestion needs a persistent Gateway WebSocket
-with the privileged *Message Content* intent, which a serverless function can't
+with the privileged _Message Content_ intent, which a serverless function can't
 hold — so the Pi worker holds it (`src/discord/gateway.ts`, zero-dep raw
 WebSocket with heartbeat/resume). It watches server messages and DMs (skipping
 bots, optionally filtered to `DISCORD_WATCH_CHANNELS`), buffers them, and
@@ -406,12 +406,12 @@ and TTL'd so heavy servers can't swamp memory. That's what lets Steven ask
 channel overview or per-channel history, `recall` searches digests alongside
 notes/facts/tasks, and the agent points him to the channel for the full thread.
 Batches are deduped by id, so a worker retry never double-processes. Enable the
-*Message Content Intent* in the Discord Developer Portal (Bot → Privileged
+_Message Content Intent_ in the Discord Developer Portal (Bot → Privileged
 Gateway Intents) or the gateway closes with code 4014.
 
 ## Model strategy
 
-Root runs `claude-sonnet-5` for planning and reasoning. Push heavy planning to
+Root runs `claude-opus-5` for planning and reasoning. Push heavy planning to
 `claude-opus-4.8` and cheap, high-volume subtasks to `claude-haiku-4.5` via a
 subagent. Per-agent model is set in each `agent.ts`.
 
