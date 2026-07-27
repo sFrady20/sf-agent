@@ -4,7 +4,15 @@
 
 import { randomUUID } from "node:crypto";
 import type { Kv } from "./kv.js";
-import type { ConversationDigest, Fact, Location, Note, Task, WorkSchedule } from "./types.js";
+import type {
+  ActivityEntry,
+  ConversationDigest,
+  Fact,
+  Location,
+  Note,
+  Task,
+  WorkSchedule,
+} from "./types.js";
 
 const now = () => new Date().toISOString();
 
@@ -144,6 +152,34 @@ export function createConversations(kv: Kv) {
           return { channel: last.channel, channelId: last.channelId, lastAt: last.at, latest: last.summary };
         })
         .sort((a, b) => b.lastAt.localeCompare(a.lastAt));
+    },
+  };
+}
+
+export function createActivity(kv: Kv) {
+  const prefix = "activity:";
+  const MAX_PER_SOURCE = 200; // ~a few weeks of real mail; one KV value per source
+  const TTL = 30 * 86_400; // old traffic fades out on its own
+  return {
+    async add(input: Omit<ActivityEntry, "at">): Promise<ActivityEntry> {
+      const entry: ActivityEntry = { ...input, at: now() };
+      const key = prefix + input.source;
+      const raw = await kv.get(key);
+      const entries = raw ? (JSON.parse(raw) as ActivityEntry[]) : [];
+      entries.push(entry);
+      await kv.set(key, JSON.stringify(entries.slice(-MAX_PER_SOURCE)), { ttlSeconds: TTL });
+      return entry;
+    },
+    // Newest-first: one source's log, or every surface flattened.
+    async recent(opts: { source?: string; limit?: number } = {}): Promise<ActivityEntry[]> {
+      const limit = opts.limit ?? 50;
+      if (opts.source) {
+        const raw = await kv.get(prefix + opts.source);
+        const entries = raw ? (JSON.parse(raw) as ActivityEntry[]) : [];
+        return entries.reverse().slice(0, limit);
+      }
+      const all = (await readAll<ActivityEntry[]>(kv, prefix)).flat();
+      return all.sort((a, b) => b.at.localeCompare(a.at)).slice(0, limit);
     },
   };
 }

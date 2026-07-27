@@ -33,6 +33,28 @@ export async function workerFetch(
   }
 }
 
+// A worker error, said usefully. An empty body means the connection died before
+// the worker answered (Tailscale Funnel's own 502) — a crashed or restarting
+// worker, NOT the same thing as the worker reporting a problem. When there is a
+// body, it carries the real reason, so pass it through verbatim.
+export async function workerError(res: Response): Promise<Error> {
+  const body = (await res.text().catch(() => "")).trim();
+  if (!body) {
+    return new Error(
+      `Worker ${res.status} with no response body — the worker process died mid-request ` +
+        `or is restarting (check its logs: journalctl -u sf-pi-worker).`,
+    );
+  }
+  let reason = body;
+  try {
+    const parsed = JSON.parse(body) as { error?: string };
+    if (parsed.error) reason = parsed.error;
+  } catch {
+    // not JSON — use the raw text
+  }
+  return new Error(`Worker ${res.status}: ${reason.slice(0, 300)}`);
+}
+
 export async function scheduleRemoteReminder(
   message: string,
   inMinutes: number,
@@ -41,7 +63,7 @@ export async function scheduleRemoteReminder(
     method: "POST",
     body: JSON.stringify({ type: "reminder", message, delaySeconds: Math.round(inMinutes * 60) }),
   });
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return (await res.json()) as { id: string; fireAt: string };
 }
 
@@ -53,7 +75,7 @@ export async function schedulePresenceReminder(
     method: "POST",
     body: JSON.stringify({ type: "presence", message, trigger }),
   });
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
 }
 
 export interface PendingReminders {
@@ -63,14 +85,14 @@ export interface PendingReminders {
 
 export async function listRemoteReminders(): Promise<PendingReminders> {
   const res = await workerFetch("/jobs");
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return (await res.json()) as PendingReminders;
 }
 
 export async function cancelRemoteReminder(id: string): Promise<boolean> {
   const res = await workerFetch(`/jobs/${encodeURIComponent(id)}`, { method: "DELETE" });
   if (res.status === 404) return false;
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return true;
 }
 
@@ -98,13 +120,13 @@ export async function checkRemoteParking(): Promise<ParkingResult> {
     body: "{}",
     timeoutMs: PARKING_CHECK_TIMEOUT_MS,
   });
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return (await res.json()) as ParkingResult;
 }
 
 export async function remoteParkingStatus(): Promise<ParkingStatus> {
   const res = await workerFetch("/camera/parking");
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return (await res.json()) as ParkingStatus;
 }
 
@@ -117,12 +139,12 @@ export async function watchRemoteParking(input: {
     method: "POST",
     body: JSON.stringify(input),
   });
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return (await res.json()) as { endsAt: string; intervalSeconds: number };
 }
 
 export async function stopRemoteParkingWatch(): Promise<boolean> {
   const res = await workerFetch("/camera/parking/watch", { method: "DELETE" });
-  if (!res.ok) throw new Error(`Worker ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw await workerError(res);
   return ((await res.json()) as { stopped: boolean }).stopped;
 }

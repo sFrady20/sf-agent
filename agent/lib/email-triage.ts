@@ -41,8 +41,18 @@ const TriageSchema = z.object({
     )
     .describe("Concrete to-dos implied by the email."),
   facts: z
-    .array(z.object({ key: z.string(), value: z.string() }))
-    .describe("Durable facts worth remembering (appointments, account details, deadlines)."),
+    .array(
+      z.object({
+        key: z.string().describe("Short stable snake_case label, e.g. 'geico_policy_number'."),
+        value: z.string(),
+      }),
+    )
+    .describe(
+      "Durable reference info Steven will plausibly ask for later — a policy or account number, " +
+        "a changed address or contact, the date of a scheduled appointment. NOT a summary of the " +
+        "email, not one-off trivia, not anything a recorded task already covers. The bar is high: " +
+        "most emails yield none.",
+    ),
   reminders: z
     .array(z.object({ message: z.string(), inMinutes: z.number().positive() }))
     .describe("Timed reminders the email implies, e.g. 'remind me in an hour'."),
@@ -106,7 +116,9 @@ export async function triageEmail(email: TriageInput, chatId?: string): Promise<
   }
   for (const f of object.facts) {
     await store.facts.set(f.key, f.value);
-    actions.push(`+ fact: ${f.key}`);
+    // Show what was actually remembered — a bare key reads as noise.
+    const value = f.value.length > 60 ? `${f.value.slice(0, 57)}…` : f.value;
+    actions.push(`+ remembered ${f.key.replace(/_/g, " ")}: ${value}`);
   }
   // Passive completion: close tasks this email confirms are done.
   for (const idx of object.completedTaskIndexes) {

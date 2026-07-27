@@ -152,6 +152,7 @@ export interface TriageMessage {
   from: string;
   subject: string;
   body: string;
+  snippet: string; // Gmail's own one-liner — feeds the activity log
   labelIds: string[];
   bulk: boolean; // looks like a mailing list / bulk sender
 }
@@ -164,6 +165,7 @@ export async function getMessageForTriage(id: string): Promise<TriageMessage> {
     from: header(m, "From"),
     subject: header(m, "Subject"),
     body: extractBody(m.payload).slice(0, 3000),
+    snippet: m.snippet ?? "",
     labelIds: m.labelIds ?? [],
     bulk: Boolean(listUnsub) || /bulk|list|junk/i.test(precedence),
   };

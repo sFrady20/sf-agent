@@ -93,6 +93,7 @@ export async function calendarFetch(
   if (!res.ok) {
     throw new Error(`Calendar API ${res.status}: ${await res.text()}`);
   }
+  if (res.status === 204) return null; // DELETE returns no body
   return res.json();
 }
 

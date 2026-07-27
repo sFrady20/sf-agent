@@ -14,8 +14,9 @@ The core pain: planning appointments, recurring chores, and remembering things.
 
 - ✅ Quick-capture inbox (`capture`) — text it a thought, it files it.
 - ✅ Recurring chores + tasks (`add_task` / `list_tasks`) with cadence + due dates.
-- ✅ Google Calendar read/write (`list_calendar_events` / `create_calendar_event`)
-  via a service account (writes are approval-gated).
+- ✅ Google Calendar read/write/delete (`list_calendar_events` /
+  `create_calendar_event` / `delete_calendar_event`) via a service account
+  (writes and deletes are approval-gated).
 - ✅ Recurring-chore reminders: rollover on completion (`complete_task`) plus
   due/overdue nudges via the reminder endpoint (GitHub Actions cron).
 - ✅ Appointment reminders: near-time nudges (reminder endpoint) + day-ahead in the
@@ -56,6 +57,10 @@ The "remembering things throughout the day" problem.
   (tasks/facts/reminders/closes) are reported in one compact message.
 - ✅ Standing triage rules: the `email_triage_rules` fact (set conversationally)
   feeds every triage call; triage also sets task stakes and reads HTML-only mail.
+- ✅ Inbox recall memory: every non-spam email is logged (sender, subject,
+  snippet — no model, no bodies) to the surface-generic `activity` store, capped
+  + TTL'd, searchable via `recall` — "did I get that email from GEICO?" works
+  even when triage skipped it. New surfaces reuse the same store.
 - 💡 On-demand thread summaries.
 
 ## 💬 Discord

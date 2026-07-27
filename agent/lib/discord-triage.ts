@@ -53,8 +53,17 @@ const TriageSchema = z.object({
     )
     .describe("Concrete to-dos for Steven implied by the messages (things HE must do)."),
   facts: z
-    .array(z.object({ key: z.string(), value: z.string() }))
-    .describe("Durable facts worth remembering (plans made, decisions, dates, names)."),
+    .array(
+      z.object({
+        key: z.string().describe("Short stable snake_case label, e.g. 'raid_night_schedule'."),
+        value: z.string(),
+      }),
+    )
+    .describe(
+      "Durable reference info Steven will plausibly ask for later — a firm plan or decision, a " +
+        "date, a name he'll need. NOT a recap of the chatter, not one-off remarks (channelDigests " +
+        "already covers what was discussed). The bar is high: most batches yield none.",
+    ),
   reminders: z
     .array(z.object({ message: z.string(), inMinutes: z.number().positive() }))
     .describe("Timed reminders the messages imply ('raid at 9', 'call in an hour')."),
@@ -150,7 +159,9 @@ export async function triageDiscordBatch(
   }
   for (const f of object.facts) {
     await store.facts.set(f.key, f.value);
-    actions.push(`+ fact: ${f.key}`);
+    // Show what was actually remembered — a bare key reads as noise.
+    const value = f.value.length > 60 ? `${f.value.slice(0, 57)}…` : f.value;
+    actions.push(`+ remembered ${f.key.replace(/_/g, " ")}: ${value}`);
   }
   for (const idx of object.completedTaskIndexes) {
     const t = openTasks[idx];

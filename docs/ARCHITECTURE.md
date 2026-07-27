@@ -29,7 +29,7 @@ agent/
     delete_note.ts        Remove a handled note.
     current_time.ts       Authoritative local time (host clock + DST-aware offset).
     set_location.ts       Set/clear a travel timezone override (auto-expires).
-    recall.ts             Search notes + facts + tasks + Discord digests.
+    recall.ts             Search notes + facts + tasks + Discord digests + email log.
     discord_recap.ts      What people were talking about on Discord (per-channel digests).
     remember_fact.ts      Save/update durable profile facts.
     list_facts.ts         List all profile facts.
@@ -39,6 +39,7 @@ agent/
     reopen_task.ts        Reopen a task wrongly assumed done.
     list_calendar_events.ts    Read Google Calendar.
     create_calendar_event.ts   Write to Google Calendar (approval-gated).
+    delete_calendar_event.ts   Delete a Google Calendar event (approval-gated).
     harmonic_matches.ts   Camelot-wheel compatible keys (DJ).
     list_work.ts          List work from the GitHub board.
     add_work_item.ts      Add a card to the GitHub board.
@@ -108,10 +109,14 @@ session, so it lives in a small storage layer instead:
   between invocations, so configure KV before relying on memory there. Lists read
   via one batched `MGET`, not a round trip per key.
 - `repositories.ts` — typed repos (`notes`, `facts`, `tasks`, `reminders`,
-  `conversations`) that own their key prefixes and JSON serialization.
+  `conversations`, `activity`) that own their key prefixes and JSON serialization.
   `conversations` holds rolling per-channel Discord digests — capped at 30
   entries per channel with a 30-day TTL, so heavy chatter can never swamp the
-  store.
+  store. `activity` is the surface-generic sibling: a rolling per-source log of
+  what crossed each interaction surface (today: every non-spam email — sender,
+  subject, snippet; no model call, no bodies), capped at 200 entries per source
+  with the same 30-day TTL. New surfaces write to `activity` with their own
+  `source` tag and get recall for free.
 - `index.ts` — assembles `store` once; import it anywhere:
   `import { store } from "../lib/store/index.js";`
 
@@ -198,7 +203,7 @@ export default defineTool({
 ```
 
 **Google Calendar (service account)** — wired via `lib/google.ts` and the
-`list_calendar_events` / `create_calendar_event` tools. No per-user OAuth: a
+`list_calendar_events` / `create_calendar_event` / `delete_calendar_event` tools. No per-user OAuth: a
 service account signs a JWT locally (zero-dep, Node crypto) and exchanges it for
 an access token. To set it up:
 
@@ -317,7 +322,12 @@ memory in sync, and only pings when something is time-sensitive:
   transient failure retries instead of dropping mail; an expired baseline
   (Gmail keeps ~a week) resets with a warning. HTML-only mail is tag-stripped
   so triage isn't blind to it.
-- **Free spam/bulk barrier first** (no model): skips Gmail's Promotions / Social /
+- **Every non-spam email is logged first** (no model): sender + subject + Gmail's
+  snippet go into the `activity` store before the importance barrier, so "did I
+  get that email from GEICO the other day?" is answerable via `recall` even when
+  triage never touched the message. Only Spam/Trash are excluded; the log is
+  capped (200 entries) and TTL'd (30 days) so it stays small.
+- **Free spam/bulk barrier next** (no model): skips Gmail's Promotions / Social /
   Updates / Forums / Spam categories and mailing-list mail (`List-Unsubscribe`,
   `Precedence: bulk`).
 - For what's left, **one cheap structured model call** (`lib/email-triage.ts`,

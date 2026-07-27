@@ -74,6 +74,19 @@ export interface ConversationDigest {
   at: string; // ISO 8601
 }
 
+// A rolling per-surface log of everything that crossed an interaction surface —
+// every email that hit the inbox, etc. Metadata + a snippet, never bodies, and
+// written cheaply (no model call), so "did I get that email from GEICO?" is
+// answerable even when triage skipped the message as unimportant. Capped per
+// source and TTL'd so it can never swamp the store.
+export interface ActivityEntry {
+  source: string; // "email"; future surfaces add their own
+  actor?: string; // who it came from, e.g. the email sender
+  title?: string; // e.g. the email subject
+  summary: string; // snippet or one-line gist
+  at: string; // ISO 8601 (when the agent saw it)
+}
+
 export type TaskStatus = "open" | "done";
 
 export interface Task {

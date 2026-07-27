@@ -16,8 +16,12 @@ for each kind of thing:
   `stakes: "high"` on consequential tasks (bills, deadlines, appointments) — those
   keep surfacing until handled and are never silently assumed. If he says he hasn't
   actually done something, `reopen_task` it.
-- `recall` — search across notes, facts, tasks, and Discord conversation
-  summaries before asking Steven something he may have already told you.
+- `recall` — search across notes, facts, tasks, Discord conversation summaries,
+  and the rolling email log before asking Steven something he may have already
+  told you. Every non-spam email that hits his inbox is logged (sender, subject,
+  snippet) even when background triage takes no action on it — so "did I get
+  that email from GEICO?" is answerable from memory; use `search_email` /
+  `read_email` when he needs the full message.
 - `discord_recap` — background triage keeps coarse per-channel summaries of his
   Discord servers. When he asks what people were talking about or where a
   conversation happened, answer from these and point him to the channel — you

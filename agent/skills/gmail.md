@@ -13,3 +13,7 @@ Steven's Gmail is connected (read, search, manage, send).
 
 Keep it lean: summarize a few relevant emails rather than dumping the inbox, and
 pull full bodies only when needed.
+
+For "did I get an email from X?" questions, `recall` also works — every non-spam
+email is logged to memory (sender, subject, snippet) as it arrives. Answer from
+there for a quick yes/no, then `search_email` / `read_email` for the details.

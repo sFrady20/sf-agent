@@ -26,9 +26,17 @@ const SKIP_LABELS = new Set([
   "TRASH",
 ]);
 
+// Actual junk stays out of the activity log too; everything else — including
+// bulk mail triage skips — is logged so it can be recalled later.
+const NEVER_LOG = new Set(["SPAM", "TRASH"]);
+
 function worthProcessing(msg: TriageMessage): boolean {
   if (msg.bulk) return false;
   return !msg.labelIds.some((l) => SKIP_LABELS.has(l));
+}
+
+function worthLogging(msg: TriageMessage): boolean {
+  return !msg.labelIds.some((l) => NEVER_LOG.has(l));
 }
 
 function authorized(req: Request): boolean {
@@ -85,6 +93,13 @@ export default defineChannel({
               await store.reminders.mark(`email:${id}`);
               try {
                 const msg = await getMessageForTriage(id);
+                // Rolling inbox memory — logged before the importance barrier, so
+                // "did I get that email from X?" works even for mail triage skips.
+                if (worthLogging(msg)) {
+                  await store.activity
+                    .add({ source: "email", actor: msg.from, title: msg.subject, summary: msg.snippet })
+                    .catch((err) => console.warn("[gmail] activity log failed", id, err));
+                }
                 if (!worthProcessing(msg)) continue; // free spam/bulk barrier
                 await triageEmail(msg, chatId); // cheap model: update tasks/memory; ping if urgent
               } catch (err) {

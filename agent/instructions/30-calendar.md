@@ -7,6 +7,9 @@ Steven's Google Calendar is connected (read/write via a service account).
 - To add something, call `current_time` first (so you know today's date and what
   "tomorrow"/"next Friday" resolve to), confirm the title, date, and time with
   Steven, then call `create_calendar_event` — it asks for approval.
+- To remove something, call `list_calendar_events` to find it, confirm with
+  Steven which event he means, then call `delete_calendar_event` with its id —
+  it asks for approval, since deletion is irreversible.
 - Pass the local wall-clock time (e.g. `2026-07-01T18:00:00`). The tool attaches
   the timezone and Google resolves the UTC offset, including DST — so never
   compute or hardcode an offset like -04:00/-05:00 yourself.
