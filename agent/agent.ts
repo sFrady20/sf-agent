@@ -4,5 +4,5 @@ import { defineAgent } from "eve";
 // "anthropic/claude-opus-4.8" for heavier planning, or drop cheap subtasks onto
 // "anthropic/claude-haiku-4.5" via a subagent.
 export default defineAgent({
-  model: "anthropic/claude-sonnet-5",
+  model: "anthropic/claude-opus-5",
 });
